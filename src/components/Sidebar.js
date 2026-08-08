@@ -101,10 +101,28 @@ export class Sidebar {
           </div>
           <div class="deity-card-name">${deity.id}</div>
           ${deity.originalScript ? `<div class="original-script">${deity.originalScript}</div>` : ''}
-          <div class="deity-card-epithet">${deity.epithet}</div>
+          <div class="deity-card-epithet">${deity.epithet || ''}</div>
+
+          ${deity.desc ? `
+            <div class="deity-desc" style="font-size:12px;color:var(--text-2);line-height:1.55;margin:8px 0 10px;">
+              ${deity.desc}
+            </div>` : ''}
+
+          ${(deity.domains || []).length ? `
+            <div class="deity-domains" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+              ${deity.domains.map(d => `<span class="domain-tag">${d}</span>`).join('')}
+            </div>` : ''}
+
+          ${(deity.symbols || []).length ? `
+            <div style="margin-bottom:8px;">
+              <div class="meta-label">Symbols</div>
+              <div class="meta-value" style="font-size:11px;color:var(--text-2);">${deity.symbols.join(' · ')}</div>
+            </div>` : ''}
+
           <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
             <span class="era-badge">📅 ${this.eraLabel(deity.era)}</span>
           </div>
+
           ${refs.length ? `
             <div class="deity-refs">
               <div class="refs-title">📜 Primary sources</div>

@@ -46,14 +46,6 @@ export class Generator {
       const metric     = this._normalizeMetric(rawMetric);
       const threshold  = this.store.get(STATE_KEYS.GRAPH_THRESHOLD)  || 0.35;
       const linkMode   = this.store.get(STATE_KEYS.LINK_MODE)        || 'top5';
-      const eraFilter  = this.store.get(STATE_KEYS.ERA_FILTER)       || 0;
-
-      const eraMap = { 5: -2000, 4: -1500, 3: -800, 2: -100, 1: 800 };
-      let candidateDeities = DEITIES;
-      if (eraFilter > 0) {
-        const cutoff = eraMap[eraFilter];
-        candidateDeities = DEITIES.filter(d => d.era >= cutoff);
-      }
 
       const existing = this.store.get(STATE_KEYS.GRAPH_DATA);
       const existingNodes = existing.nodes || [];
@@ -61,7 +53,7 @@ export class Generator {
 
       const connections = await workerClient.getConnections(
         deity,
-        candidateDeities,
+        DEITIES,
         metric,
         threshold
       );
@@ -128,40 +120,40 @@ export class Generator {
     this.store.set(STATE_KEYS.UI_TOAST, `✦ ${d.id} — ${d.epithet}`);
   }
 
-  handleNodeClick(nodeId) {
-    const mode = this.store.get(STATE_KEYS.MODE);
-    const expandOnClick = this.store.get(STATE_KEYS.EXPAND_ON_CLICK);
+    handleNodeClick(nodeId) {
+      const mode = this.store.get(STATE_KEYS.MODE);
+      const expandOnClick = this.store.get(STATE_KEYS.EXPAND_ON_CLICK);
 
-    if (mode === 'compare') {
-      const a = this.store.get(STATE_KEYS.COMPARE_A);
-      if (!a) {
-        this.store.set(STATE_KEYS.COMPARE_A, nodeId);
-        this.store.set(STATE_KEYS.UI_TOAST, `Selected ${nodeId}. Pick a second deity.`);
-      } else {
-        this.store.set(STATE_KEYS.COMPARE_B, nodeId);
-        this.store.set(STATE_KEYS.MODE, 'explore');
-        document.getElementById('compare-modal')?.classList.add('open');
+      if (mode === 'compare') {
+        const a = this.store.get(STATE_KEYS.COMPARE_A);
+        if (!a) {
+          this.store.set(STATE_KEYS.COMPARE_A, nodeId);
+          this.store.set(STATE_KEYS.UI_TOAST, `Selected ${nodeId}. Pick a second deity.`);
+        } else {
+          this.store.set(STATE_KEYS.COMPARE_B, nodeId);
+          this.store.set(STATE_KEYS.MODE, 'explore');
+        }
+        return;
       }
-      return;
-    }
 
-    if (mode === 'path') {
-      const from = this.store.get(STATE_KEYS.PATH_FROM);
-      if (!from) {
-        this.store.set(STATE_KEYS.PATH_FROM, nodeId);
-        this.store.set(STATE_KEYS.UI_TOAST, `Path start: ${nodeId}. Pick destination.`);
-      } else {
-        this.store.set(STATE_KEYS.PATH_TO, nodeId);
-        this.store.set(STATE_KEYS.MODE, 'explore');
+      if (mode === 'path') {
+        const from = this.store.get(STATE_KEYS.PATH_FROM);
+        if (!from) {
+          this.store.set(STATE_KEYS.PATH_FROM, nodeId);
+          this.store.set(STATE_KEYS.UI_TOAST, `Path start: ${nodeId}. Pick destination.`);
+        } else {
+          this.store.set(STATE_KEYS.PATH_TO, nodeId);
+          this.store.set(STATE_KEYS.MODE, 'explore');
+          this.findPath(from, nodeId);
+        }
+        return;
       }
-      return;
-    }
 
-    this.store.set(STATE_KEYS.SELECTED_DEITY, nodeId);
-    if (expandOnClick) {
-      this.generate();
+      this.store.set(STATE_KEYS.SELECTED_DEITY, nodeId);
+      if (expandOnClick) {
+        this.generate();
+      }
     }
-  }
 
   handleTraitClick(trait) {
     this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, trait);

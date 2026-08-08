@@ -40,12 +40,6 @@ export class GraphControls {
           <span class="slider-val" id="thresh-val">0.35</span>
         </div>
 
-        <div class="control-group slider-row">
-          <span class="slider-label">Era</span>
-          <input type="range" id="era-sl" min="0" max="5" value="0" />
-          <span class="slider-val" id="era-val">All</span>
-        </div>
-
         <div class="control-group">
           <label class="toggle-row">
             <span class="toggle-label">Cluster</span>

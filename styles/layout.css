@@ -478,3 +478,49 @@
 
 /* Scrollable non-graph views */
 #matrix-view, #archetypes-view { overflow-y: auto; }
+
+/* ── Graph controls floating bar ─────────────────────────────── */
+.controls-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(24, 24, 27, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  padding: 12px;
+  max-width: 280px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.control-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.control-group + .control-group {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-0);
+}
+
+/* Pantheon legend */
+#pantheon-legend,
+.pantheon-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  background: rgba(24, 24, 27, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  z-index: var(--z-overlay);
+  max-width: 220px;
+}

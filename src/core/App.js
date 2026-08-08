@@ -28,6 +28,7 @@ export class App {
     this.feedback  = new FeedbackUI();
     this.router    = new Router(store);
     this.generator = new Generator(store, this.feedback);
+    this.methodologyModal = new MethodologyModal();
 
     this.graphView      = new GraphView(store, this.generator, this.feedback);
     this.matrixView     = new MatrixView(store, this.generator);
@@ -54,6 +55,7 @@ export class App {
     this.archetypesView.mount(document.getElementById('archetypes-view'));
     this.mapView.mount(document.getElementById('map-view'));
 
+    this.methodologyModal.mount();
     this.sidebar.mount();
     this.searchBar.mount(document.getElementById('search-wrap'));
     this.tours.mount(document.getElementById('stab-tours-content'));
@@ -91,7 +93,7 @@ export class App {
         if (cont) cont.style.display = (t === tab) ? '' : 'none';
       });
     };
-    document.getElementById('sidebar-tabs')?.addEventListener('click', e => {
+    document.querySelector('.sidebar-tabs')?.addEventListener('click', e => {
       const btn = e.target.closest('[data-tab]');
       if (btn) setSidebarTab(btn.dataset.tab);
     });

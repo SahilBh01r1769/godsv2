@@ -142,6 +142,16 @@ export class GraphView {
       .attr('fill', d => PANTHEON_COLORS[d.pantheon] || '#888')
       .attr('stroke', d => d.id === centerDeityId ? '#fff' : 'none')
       .attr('stroke-width', 2);
+    
+    nodeEnter.append('circle')
+      .attr('class', 'pin-ring')
+      .attr('r', d => d.id === centerDeityId ? 18 : 14)
+      .attr('fill', 'none')
+      .attr('stroke', 'var(--gold)')
+      .attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '3 3')
+      .style('display', 'none')
+      .style('pointer-events', 'none');
 
     nodeEnter.append('text')
       .attr('class', 'node-label')
@@ -153,16 +163,25 @@ export class GraphView {
     const nodeMerge = nodeEnter.merge(node);
 
     if (animate) {
-      nodeMerge.transition()
-        .duration(800)
+      nodeEnter
+        .transition()
+        .delay((_, i) => i * 40)
+        .duration(500)
         .ease(d3.easeCubicOut)
         .attr('opacity', 1);
 
-      nodeMerge.select('circle')
+      nodeEnter.select('circle')
         .transition()
-        .duration(800)
+        .delay((_, i) => i * 40)
+        .duration(600)
         .ease(d3.easeElasticOut.amplitude(1).period(0.4))
         .attr('r', d => d.id === centerDeityId ? 12 : 8);
+
+      // existing nodes stay visible immediately
+      nodeMerge.filter(function () {
+        return !this.__enter__;   // only non-enter
+      }).attr('opacity', 1)
+        .select('circle').attr('r', d => d.id === centerDeityId ? 12 : 8);
     } else {
       nodeMerge.attr('opacity', 1);
       nodeMerge.select('circle').attr('r', d => d.id === centerDeityId ? 12 : 8);
@@ -172,6 +191,10 @@ export class GraphView {
       .on('click', (e, d) => {
         e.stopPropagation();
         this.generator.handleNodeClick(d.id);
+      })
+      .on('dblclick', (e, d) => {
+        e.stopPropagation();
+        this.togglePin(d);
       })
       .on('mouseover', (e, d) => this.onNodeHover(e, d))
       .on('mouseout', () => this.hideTooltip());
@@ -202,7 +225,7 @@ export class GraphView {
         .force('clusterY', d3.forceY(d => clusterCenters[d.pantheon]?.y || H / 2).strength(0.2));
     }
 
-    this.simulation.alpha(1).restart();
+    this.simulation.alpha(0.45).restart();
 
     this.simulation.on('tick', () => {
       linkMerge
@@ -236,6 +259,31 @@ export class GraphView {
       d.fx = null;
       d.fy = null;
     }
+  }
+
+  togglePin(d) {
+    const pinned = new Set(this.store.get(STATE_KEYS.PINNED_NODES));
+    if (pinned.has(d.id)) {
+      pinned.delete(d.id);
+      d.fx = null;
+      d.fy = null;
+    } else {
+      pinned.add(d.id);
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+    this.store.set(STATE_KEYS.PINNED_NODES, pinned);
+    this.updatePinRings();
+    this.store.set(STATE_KEYS.UI_TOAST,
+      pinned.has(d.id) ? `Pinned ${d.id}` : `Unpinned ${d.id}`);
+  }
+
+  updatePinRings() {
+    const pinned = this.store.get(STATE_KEYS.PINNED_NODES);
+    this.gNodes.selectAll('g.node').each(function (d) {
+      d3.select(this).select('.pin-ring')
+        .style('display', pinned.has(d.id) ? 'block' : 'none');
+    });
   }
 
   onNodeHover(event, d) {
@@ -308,6 +356,8 @@ export class GraphView {
 
   unpinAll(nodes) {
     nodes.forEach(n => { n.fx = null; n.fy = null; });
+    this.store.set(STATE_KEYS.PINNED_NODES, new Set());
+    this.updatePinRings();
     if (this.simulation) this.simulation.alpha(0.3).restart();
   }
 
