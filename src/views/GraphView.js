@@ -105,16 +105,26 @@ export class GraphView {
       .attr('stroke-width', 0);
 
     const linkMerge = linkEnter.merge(link)
-      .attr('stroke', d => edgeColor(d.similarity));
+      .attr('stroke', d => edgeColor(d.similarity))
+      .attr('class', d => {
+        const src = d.source.id || d.source;
+        const tgt = d.target.id || d.target;
+        if (showCognates && getCognate(src, tgt)) return 'link link-cognate';
+        if ((d.similarity || 0) >= 0.7) return 'link link-strong';
+        if ((d.similarity || 0) >= 0.45) return 'link link-medium';
+        return 'link link-weak';
+      });
 
     linkMerge.transition()
       .duration(animate ? 800 : 0)
       .ease(d3.easeCubicInOut)
-      .attr('stroke-width', d => Math.max(1, d.similarity * 4))
+      .attr('stroke-width', d => Math.max(1, (d.similarity || 0) * 4))
       .attr('stroke-opacity', d => {
-        if (showCognates && getCognate(d.source.id || d.source, d.target.id || d.target)) return 1;
-        return 0.4;
-      });
+        const src = d.source.id || d.source;
+        const tgt = d.target.id || d.target;
+        if (showCognates && getCognate(src, tgt)) return 0.95;
+        return 0.25 + (d.similarity || 0) * 0.55;
+      });;
 
     // ── Nodes with smooth transitions ──
     const node = this.gNodes.selectAll('g.node')
@@ -138,10 +148,12 @@ export class GraphView {
       );
 
     nodeEnter.append('circle')
+      .attr('class', 'node-circle')
       .attr('r', 0)
       .attr('fill', d => PANTHEON_COLORS[d.pantheon] || '#888')
-      .attr('stroke', d => d.id === centerDeityId ? '#fff' : 'none')
-      .attr('stroke-width', 2);
+      .attr('stroke', d => d.id === centerDeityId ? '#fff' : 'rgba(255,255,255,0.2)')
+      .attr('stroke-width', d => d.id === centerDeityId ? 2.5 : 1.5)
+      .style('color', d => PANTHEON_COLORS[d.pantheon] || '#888');
     
     nodeEnter.append('circle')
       .attr('class', 'pin-ring')
@@ -161,6 +173,8 @@ export class GraphView {
       .style('display', showLabels ? 'block' : 'none');
 
     const nodeMerge = nodeEnter.merge(node);
+    
+    nodeMerge.classed('node-center', d => d.id === centerDeityId);
 
     if (animate) {
       nodeEnter
@@ -170,7 +184,7 @@ export class GraphView {
         .ease(d3.easeCubicOut)
         .attr('opacity', 1);
 
-      nodeEnter.select('circle')
+      nodeEnter.select('circle.node-circle')
         .transition()
         .delay((_, i) => i * 40)
         .duration(600)
@@ -181,7 +195,7 @@ export class GraphView {
       nodeMerge.filter(function () {
         return !this.__enter__;   // only non-enter
       }).attr('opacity', 1)
-        .select('circle').attr('r', d => d.id === centerDeityId ? 12 : 8);
+        .select('circle.node-circle').attr('r', d => d.id === centerDeityId ? 12 : 8);
     } else {
       nodeMerge.attr('opacity', 1);
       nodeMerge.select('circle').attr('r', d => d.id === centerDeityId ? 12 : 8);

@@ -29,7 +29,9 @@ export class Sidebar {
     this.feedback = feedback;
   }
 
-  mount() {}
+  mount() {
+    this.render();
+  }
 
   setupSubscriptions() {
     this.store.subscribe(STATE_KEYS.SELECTED_DEITY, () => this.render());
@@ -45,9 +47,17 @@ export class Sidebar {
     if (!deityId) {
       infoPanel.innerHTML = `
         <div class="panel">
-          <div style="text-align:center;color:var(--text-3);font-size:12px;padding:24px 12px;">
-            <div style="font-size:32px;opacity:.4;margin-bottom:10px;">☽</div>
-            Select or search for a deity to explore their connections.
+          <div class="panel-title"><span class="panel-icon">☽</span> Explore</div>
+          <div class="card" style="padding:14px 12px;">
+            <p style="font-size:12px;color:var(--text-2);line-height:1.55;margin:0 0 12px;">
+              Select a deity from search or the graph to see traits, domains, sources, and connections.
+            </p>
+            <div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">
+              Try a tour
+            </div>
+            <p style="font-size:11px;color:var(--text-2);margin:0;line-height:1.5;">
+              Open the <strong style="color:var(--text-1)">Guided Tours</strong> tab for curated paths through storm gods, psychopomps, and solar deities.
+            </p>
           </div>
         </div>`;
       return;

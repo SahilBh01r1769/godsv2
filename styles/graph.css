@@ -26,19 +26,19 @@
     radial-gradient(1px 1px at 250px 160px, #fff, transparent);
   background-size: 280px 200px;   /* tile size – tweak to taste */
   background-repeat: repeat;
-  opacity: 0.55;
+  opacity: 0.75;
 }
 
-/* optional very faint nebula glow */
 #graph-view::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse at 30% 20%, rgba(80,60,180,0.08), transparent 50%),
-    radial-gradient(ellipse at 70% 80%, rgba(40,80,160,0.06), transparent 50%);
   z-index: 0;
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 30%, rgba(0, 0, 0, 0.55) 100%),
+    radial-gradient(ellipse at 25% 20%, rgba(124, 58, 237, 0.1), transparent 45%),
+    radial-gradient(ellipse at 75% 75%, rgba(245, 158, 11, 0.06), transparent 40%);
 }
 
 /* ── Edges / Links ──────────────────────────────────────────────── */
@@ -46,9 +46,6 @@
   stroke-linecap: round;
   transition: stroke-opacity 0.2s ease, stroke-width 0.2s ease, filter 0.2s ease;
   cursor: pointer;
-  stroke: #c084fc;           /* force a bright default color */
-  stroke-opacity: 0.85;      /* force high opacity */
-  stroke-width: 2.5px;       /* force thickness so we can see them */
 }
 
 .link:hover { 
@@ -60,7 +57,7 @@
 /* Vibrant, high-contrast edge colors */
 .link-strong  { stroke: #c084fc; }
 .link-medium  { stroke: #22d3ee; }
-.link-weak    { stroke: #94a3b8; }
+.link-weak    { stroke: #64748b; }
 .link-cognate { stroke: #fbbf24; stroke-dasharray: 6 4; }
 .link-path    { stroke: var(--accent-bright); stroke-dasharray: none; }
 
@@ -86,6 +83,19 @@
   stroke: var(--gold-bright) !important;
   stroke-width: 2.5px !important;
   filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.4));
+}
+
+.node:hover .node-circle {
+  filter: drop-shadow(0 0 10px currentColor);
+}
+
+.node-center .node-circle {
+  animation: centerPulse 3s ease-in-out infinite;
+}
+
+@keyframes centerPulse {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.4)); }
+  50%      { filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.7)); }
 }
 
 /* Node labels with dark stroke for perfect readability */
