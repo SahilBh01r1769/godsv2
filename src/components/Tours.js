@@ -32,7 +32,6 @@ export class Tours {
         ${TOURS.map(tour => this.buildTourCard(tour)).join('')}
       </div>`;
 
-    // Bind tour card clicks
     this.container.querySelectorAll('.tour-card').forEach(el => {
       el.addEventListener('click', () => {
         const tourId = el.dataset.tourId;
@@ -42,13 +41,17 @@ export class Tours {
   }
 
   buildTourCard(tour) {
+    // Defensive: handle missing steps/stops/whatever the property is called
+    const steps = tour.steps || tour.stops || tour.chapters || tour.route || [];
+    const stepCount = Array.isArray(steps) ? steps.length : 0;
+
     return `
       <div class="tour-card ${this.activeTourId === tour.id ? 'active' : ''}" data-tour-id="${tour.id}">
-        <span class="tour-icon">${tour.icon}</span>
+        <span class="tour-icon">${tour.icon || '✦'}</span>
         <div class="tour-card-body">
-          <div class="tour-name">${tour.name}</div>
-          <div class="tour-desc">${tour.description}</div>
-          <div class="tour-steps">${tour.steps.length} stops</div>
+          <div class="tour-name">${tour.name || tour.id}</div>
+          <div class="tour-desc">${tour.description || ''}</div>
+          <div class="tour-steps">${stepCount} stops</div>
         </div>
       </div>`;
   }
@@ -58,10 +61,17 @@ export class Tours {
     this.activeTourId = tour.id;
     this.renderTourList();
 
-    // Load first deity in tour
-    if (tour.steps.length > 0) {
-      const firstStep = tour.steps[0];
-      this.generator.loadDeity(firstStep.deityId, { resetGraph: true });
+    // Find the actual steps array (whatever it's called)
+    const steps = tour.steps || tour.stops || tour.chapters || tour.route || [];
+
+    if (steps.length > 0) {
+      // First step might be { deityId: 'Zeus' } or { id: 'Zeus' } or just 'Zeus'
+      const firstStep = steps[0];
+      const deityId = typeof firstStep === 'string'
+        ? firstStep
+        : firstStep.deityId || firstStep.id || firstStep.deity || firstStep;
+
+      this.generator.loadDeity(deityId, { resetGraph: true });
       this.store.set(STATE_KEYS.UI_TOAST, `Tour: ${tour.name}`);
     }
   }

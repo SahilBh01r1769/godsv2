@@ -34,14 +34,7 @@ export class SearchBar {
   }
 
   buildIndex(deities) {
-    this.trie = new Trie();
-    deities.forEach(d => {
-      this.trie.insert(d.id.toLowerCase(), d);
-      if (d.epithet) this.trie.insert(d.epithet.toLowerCase(), d);
-      Object.keys(d.traits || {}).forEach(t => {
-        this.trie.insert(t.toLowerCase(), d);
-      });
-    });
+    this.trie = Trie.buildFromDeities(deities);
   }
 
   bindEvents() {
@@ -49,7 +42,6 @@ export class SearchBar {
     this.input.addEventListener('keydown', e => this.onKeydown(e));
     this.input.addEventListener('blur', () => setTimeout(() => this.close(), 200));
 
-    // Cmd+K / Ctrl+K shortcut
     document.addEventListener('keydown', e => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
@@ -72,7 +64,7 @@ export class SearchBar {
 
     this.dropdown.innerHTML = this.results.map((d, i) => `
       <div class="search-result" data-index="${i}" data-id="${d.id}">
-        <span class="sr-name">${d.id}</span>
+        <span class="sr-name">${d.name || d.id}</span>
         <span class="sr-pantheon">${d.pantheon}</span>
       </div>`).join('');
 
