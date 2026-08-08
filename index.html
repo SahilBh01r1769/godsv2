@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>Indo-European Myth Network</title>
+  <meta name="description" content="Explore how Indo-European gods relate through shared archetypal traits — an interactive mythological knowledge graph." />
+  <meta property="og:title" content="Indo-European Myth Network" />
+  <meta property="og:description" content="Interactive force-directed graph of mythological trait connections across Greek, Vedic, Norse, Celtic, Roman, Slavic, and Mesopotamian pantheons." />
+  <meta property="og:type" content="website" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Greek:wght@400;700&family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/search.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- D3 (must load before ES modules) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="styles/base.css" />
+  <link rel="stylesheet" href="styles/layout.css" />
+  <link rel="stylesheet" href="styles/components.css" />
+  <link rel="stylesheet" href="styles/graph.css" />
+  <link rel="stylesheet" href="styles/views.css" />
+</head>
+<body>
+
+  <!-- ── Loader ──────────────────────────────────────────────────── -->
+  <div id="loader">
+    <div class="loader-inner">
+      <span class="loader-rune">☽</span>
+      <div class="loader-text">Loading the pantheons…</div>
+    </div>
+  </div>
+
+  <!-- ── App shell ───────────────────────────────────────────────── -->
+  <header id="header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-rune">ᛝ</span>
+        <span class="logo-text">Indo-European Myth Network</span>
+      </div>
+    </div>
+    <div class="header-center" id="view-tabs"></div>
+    <div class="header-right" id="search-wrap"></div>
+  </header>
+
+  <!-- ── Main layout ─────────────────────────────────────────────── -->
+  <div id="app-body">
+    <main id="main-panel">
+      <section id="graph-view" class="view active">
+        <svg id="graph-svg"></svg>
+        <div id="graph-controls"></div>
+        <div id="minimap-wrap"><svg id="minimap-svg"></svg></div>
+      </section>
+      <section id="matrix-view" class="view"></section>
+      <section id="archetypes-view" class="view"></section>
+      <section id="map-view" class="view"></section>
+    </main>
+
+    <aside id="sidebar">
+      <div id="sidebar-tabs">
+        <button class="stab active" data-tab="info">Info</button>
+        <button class="stab" data-tab="tours">Tours</button>
+      </div>
+      <div id="stab-info-content" class="stab-content active"></div>
+      <div id="stab-tours-content" class="stab-content"></div>
+    </aside>
+  </div>
+
+  <!-- ── Status bar ──────────────────────────────────────────────── -->
+  <div id="status-bar"></div>
+
+  <!-- ── Path strip ──────────────────────────────────────────────── -->
+  <div id="path-strip" style="display:none;">
+    <span id="path-strip-text"></span>
+    <button id="path-strip-close" class="btn btn-sm btn-ghost">✕</button>
+  </div>
+
+  <!-- ── Compare modal ───────────────────────────────────────────── -->
+  <div id="compare-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Deity Comparison</div>
+          <div class="modal-subtitle">Side-by-side trait profile with similarity breakdown</div>
+        </div>
+        <button class="btn btn-sm btn-ghost" id="compare-close">✕</button>
+      </div>
+      <div id="compare-content"></div>
+    </div>
+  </div>
+
+  <!-- ── Surprising panel ────────────────────────────────────────── -->
+  <div id="surprising-panel" style="display:none;"></div>
+
+  <!-- ── Loading indicator ───────────────────────────────────────── -->
+  <div id="loading-indicator" style="display:none;position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:var(--z-toast);pointer-events:none;">
+    <div style="display:flex;align-items:center;gap:10px;background:var(--bg-4);border:1px solid var(--border-2);border-radius:var(--r-full);padding:7px 18px;box-shadow:var(--shadow-lg);">
+      <div style="width:14px;height:14px;border:2px solid var(--text-3);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;"></div>
+      <span style="font-size:12px;color:var(--text-1);">Computing…</span>
+    </div>
+  </div>
+
+  <!-- ── Toast ───────────────────────────────────────────────────── -->
+  <div id="toast"></div>
+
+  <!-- ── Application entry point ─────────────────────────────────── -->
+  <script type="module" src="./src/core/main.js"></script>
+
+</body>
+</html>
