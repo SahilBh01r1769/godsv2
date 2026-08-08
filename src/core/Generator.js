@@ -1,7 +1,3 @@
-/* ─────────────────────────────────────────────────────────────────
-   core/Generator.js — Graph generation + worker orchestration (v2)
-   Matches the actual workerClient API
-   ───────────────────────────────────────────────────────────────── */
 import { getDeityById } from '../utils/similarity.js';
 import { workerClient } from '../utils/workerClient.js';
 import { STATE_KEYS } from '../utils/store.js';
@@ -33,6 +29,11 @@ export class Generator {
     await this.generate();
   }
 
+  _normalizeMetric(metric) {
+    const map = { cosine: 'cosine', overlap: 'overlap', jaccard: 'overlap', euclidean: 'cosine' };
+    return map[metric] || 'cosine';
+  }
+
   async generate() {
     const deityId = this.store.get(STATE_KEYS.SELECTED_DEITY);
     if (!deityId) return;
@@ -41,13 +42,12 @@ export class Generator {
 
     try {
       const deity      = getDeityById(deityId);
-      const metric     = this.store.get(STATE_KEYS.SIMILARITY_METHOD) || 'cosine';
+      const rawMetric  = this.store.get(STATE_KEYS.SIMILARITY_METHOD) || 'cosine';
+      const metric     = this._normalizeMetric(rawMetric);
       const threshold  = this.store.get(STATE_KEYS.GRAPH_THRESHOLD)  || 0.35;
       const linkMode   = this.store.get(STATE_KEYS.LINK_MODE)        || 'top5';
       const eraFilter  = this.store.get(STATE_KEYS.ERA_FILTER)       || 0;
 
-      // ── Filter deities by era before sending to worker ──
-      // ERA_FILTER: 0=all, 5=2000 BCE, 4=1500 BCE, 3=800 BCE, 2=200 BCE, 1=500 CE
       const eraMap = { 5: -2000, 4: -1500, 3: -800, 2: -100, 1: 800 };
       let candidateDeities = DEITIES;
       if (eraFilter > 0) {
@@ -55,32 +55,57 @@ export class Generator {
         candidateDeities = DEITIES.filter(d => d.era >= cutoff);
       }
 
-      // ── Call the worker with correct positional args ──
+      const existing = this.store.get(STATE_KEYS.GRAPH_DATA);
+      const existingNodes = existing.nodes || [];
+      const existingEdges = existing.edges || [];
+
       const connections = await workerClient.getConnections(
-        deity,              // full deity object, not id
-        candidateDeities,   // array of deities to compare against
-        metric,             // 'cosine' | 'overlap'
-        threshold           // 0..1
+        deity,
+        candidateDeities,
+        metric,
+        threshold
       );
 
-      // ── Apply linkMode (top5 / top10 / all) ──
-      // Worker returns sorted by score desc already
+      // Apply linkMode with cap
       let limited;
       if (linkMode === 'top5')       limited = connections.slice(0, 5);
       else if (linkMode === 'top10') limited = connections.slice(0, 10);
-      else                           limited = connections;
+      else                           limited = connections.slice(0, 30); // Cap "all" at 30
 
-      // ── Transform flat array into { nodes, edges } shape ──
-      const nodes = [deity, ...limited.map(c => c.deity)];
-      const edges = limited.map(c => ({
-        source: deity.id,
-        target: c.deity.id,
-        similarity: c.score,
-        shared: c.shared,
-      }));
+      const newEdges = [];
+      const edgeKeys = new Set(existingEdges.map(e => `${e.source}-${e.target}`));
 
-      this.store.set(STATE_KEYS.GRAPH_DATA, { nodes, edges });
-      this.store.set(STATE_KEYS.UI_STATUS, `${nodes.length} deities · ${edges.length} connections`);
+      limited.forEach(c => {
+        const key = `${deityId}-${c.deity.id}`;
+        const reverseKey = `${c.deity.id}-${deityId}`;
+        if (!edgeKeys.has(key) && !edgeKeys.has(reverseKey)) {
+          newEdges.push({
+            source: deityId,
+            target: c.deity.id,
+            similarity: c.score,
+            shared: c.shared,
+          });
+        }
+      });
+
+      const existingNodeIds = new Set(existingNodes.map(n => n.id));
+      const newNodes = limited
+        .filter(c => !existingNodeIds.has(c.deity.id))
+        .map(c => c.deity);
+
+      if (!existingNodeIds.has(deityId)) {
+        newNodes.unshift(deity);
+      }
+
+      const mergedNodes = [...existingNodes, ...newNodes];
+      const mergedEdges = [...existingEdges, ...newEdges];
+
+      this.store.set(STATE_KEYS.GRAPH_DATA, {
+        nodes: mergedNodes,
+        edges: mergedEdges,
+      });
+
+      this.store.set(STATE_KEYS.UI_STATUS, `${mergedNodes.length} deities · ${mergedEdges.length} connections`);
 
     } catch (err) {
       console.error('[Generator] Error:', err);
@@ -132,12 +157,9 @@ export class Generator {
       return;
     }
 
-    // Explore mode
+    this.store.set(STATE_KEYS.SELECTED_DEITY, nodeId);
     if (expandOnClick) {
-      this.store.set(STATE_KEYS.SELECTED_DEITY, nodeId);
       this.generate();
-    } else {
-      this.store.set(STATE_KEYS.SELECTED_DEITY, nodeId);
     }
   }
 
@@ -151,13 +173,13 @@ export class Generator {
     try {
       const path = await workerClient.findPath(
         fromId, toId, DEITIES,
-        this.store.get(STATE_KEYS.SIMILARITY_METHOD),
+        this._normalizeMetric(this.store.get(STATE_KEYS.SIMILARITY_METHOD)),
         this.store.get(STATE_KEYS.GRAPH_THRESHOLD)
       );
       if (path) {
         this.store.set(STATE_KEYS.UI_TOAST, `Path: ${path.join(' → ')}`);
       } else {
-        this.store.set(STATE_KEYS.UI_TOAST, 'No path found between those deities.');
+        this.store.set(STATE_KEYS.UI_TOAST, 'No path found.');
       }
     } catch (err) {
       this.store.set(STATE_KEYS.UI_TOAST, 'Path error: ' + err.message);

@@ -1,7 +1,26 @@
 import { TRAITS, PANTHEON_COLORS } from '../data/deities.js';
-import { traitVector, traitFillColor, getDeityById } from '../utils/similarity.js';
+import { getDeityById } from '../utils/similarity.js';
 import { getDeityRefs } from '../data/citations.js';
 import { STATE_KEYS } from '../utils/store.js';
+
+const TRAIT_COLORS = {
+  'archer': '#e87040',
+  'healer': '#6bc46d',
+  'disease sender': '#d9534f',
+  'storm god': '#5ba8e0',
+  'wilderness': '#6a9f6a',
+  'liminal outsider': '#b07cd8',
+  'ecstasy / madness': '#d47bc4',
+  'ascetic / wisdom': '#e0a846',
+  'solar': '#f0c040',
+  'war / victory': '#e85555',
+  'trickster': '#9b8fe8',
+  'smith / craft': '#c48040',
+  'sea / water': '#4a9eff',
+  'death / underworld': '#808080',
+  'fertility': '#2ec27e',
+  'fire': '#f5a623',
+};
 
 export class Sidebar {
   constructor(store, generator, feedback) {
@@ -43,11 +62,22 @@ export class Sidebar {
     const activeFilter = this.store.get(STATE_KEYS.ACTIVE_TRAIT_FILTER);
 
     const connections = (edges || [])
-      .filter(e => (e.source.id || e.source) === deityId || (e.target.id || e.target) === deityId)
-      .map(e => ({
-        id: (e.source.id || e.source) === deityId ? (e.target.id || e.target) : (e.source.id || e.source),
-        similarity: e.similarity,
-      }))
+      .filter(e => {
+        const src = e.source.id || e.source;
+        const tgt = e.target.id || e.target;
+        return src === deityId || tgt === deityId;
+      })
+      .map(e => {
+        const src = e.source.id || e.source;
+        const tgt = e.target.id || e.target;
+        const otherId = src === deityId ? tgt : src;
+        const otherDeity = getDeityById(otherId);
+        return {
+          id: otherId,
+          similarity: e.similarity,
+          pantheon: otherDeity?.pantheon || 'Unknown',
+        };
+      })
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, 10);
 
@@ -92,87 +122,149 @@ export class Sidebar {
   }
 
   renderRadar(deity) {
-    const active = TRAITS.filter(t => deity.traits && deity.traits[t] > 0);
-    if (!active.length) return '';
+    // Get only top 8 traits for cleaner visualization
+    const traitData = TRAITS.map(t => ({
+      trait: t,
+      value: deity.traits?.[t] || 0
+    })).sort((a, b) => b.value - a.value).slice(0, 8);
 
-    const size = 180, cx = size / 2, cy = size / 2, r = 70;
-    const angleStep = (2 * Math.PI) / TRAITS.length;
+    if (!traitData.some(t => t.value > 0)) return '';
 
-    let grid = '', pts = '';
-    TRAITS.forEach((t, i) => {
+    const size = 200, cx = size / 2, cy = size / 2, r = 70;
+    const angleStep = (2 * Math.PI) / traitData.length;
+
+    // Concentric circles
+    let gridCircles = '';
+    [0.33, 0.66, 1.0].forEach(frac => {
+      gridCircles += `<circle cx="${cx}" cy="${cy}" r="${r * frac}" fill="none" stroke="var(--border-1)" stroke-width="0.5" opacity="0.3"/>`;
+    });
+
+    // Axes
+    let axes = '';
+    traitData.forEach((t, i) => {
       const angle = i * angleStep - Math.PI / 2;
-      grid += `<line x1="${cx}" y1="${cy}" x2="${cx + r * Math.cos(angle)}" y2="${cy + r * Math.sin(angle)}" stroke="var(--border-1)" stroke-width="0.5"/>`;
-      const val = deity.traits[t] || 0;
-      pts += `${cx + val * r * Math.cos(angle)},${cy + val * r * Math.sin(angle)} `;
+      const x2 = cx + r * Math.cos(angle);
+      const y2 = cy + r * Math.sin(angle);
+      axes += `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="var(--border-1)" stroke-width="0.5" opacity="0.3"/>`;
+    });
+
+    // Data polygon
+    let pts = '';
+    traitData.forEach((t, i) => {
+      const angle = i * angleStep - Math.PI / 2;
+      const x = cx + t.value * r * Math.cos(angle);
+      const y = cy + t.value * r * Math.sin(angle);
+      pts += `${x},${y} `;
+    });
+
+    // Data points with labels
+    let points = '';
+    traitData.forEach((t, i) => {
+      const angle = i * angleStep - Math.PI / 2;
+      const x = cx + t.value * r * Math.cos(angle);
+      const y = cy + t.value * r * Math.sin(angle);
+      
+      // Point
+      points += `<circle cx="${x}" cy="${y}" r="3" fill="var(--accent-bright)" stroke="white" stroke-width="1.5"/>`;
+      
+      // Label (outside circle)
+      const labelR = r + 15;
+      const lx = cx + labelR * Math.cos(angle);
+      const ly = cy + labelR * Math.sin(angle);
+      
+      const shortName = t.trait.length > 12 ? t.trait.split(' ')[0] : t.trait;
+      const anchor = Math.cos(angle) > 0.3 ? 'start' : (Math.cos(angle) < -0.3 ? 'end' : 'middle');
+      
+      points += `<text x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle"
+                       font-size="8" fill="var(--text-2)" font-weight="500">${shortName}</text>`;
     });
 
     return `
       <div class="panel">
-        <div class="panel-title"><span class="panel-icon">◈</span> Trait radar</div>
-        <div class="card" style="text-align:center;">
-          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-            ${grid}
-            <polygon points="${pts.trim()}" fill="var(--accent-glow)" stroke="var(--accent)" stroke-width="1.5"/>
+        <div class="panel-title"><span class="panel-icon">◈</span> Top traits</div>
+        <div class="card" style="text-align:center;padding:12px;">
+          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow:visible;">
+            ${gridCircles}
+            ${axes}
+            <polygon points="${pts.trim()}" fill="var(--accent-glow)" fill-opacity="0.4" stroke="var(--accent)" stroke-width="1.5"/>
+            ${points}
           </svg>
         </div>
       </div>`;
   }
 
   renderHeatmap(deity, activeFilter) {
+    const sortedTraits = [...TRAITS].sort((a, b) => {
+      const va = deity.traits?.[a] || 0;
+      const vb = deity.traits?.[b] || 0;
+      return vb - va;
+    });
+
     return `
       <div class="panel">
         <div class="panel-title"><span class="panel-icon">▦</span> Trait heatmap</div>
-        <div class="card"><div class="heatmap-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
-          ${TRAITS.map(t => {
+        <div class="card" style="padding:10px 12px;">
+          ${sortedTraits.map(t => {
             const val = deity.traits?.[t] || 0;
+            const color = TRAIT_COLORS[t] || '#888';
+            const pct = (val * 100).toFixed(0);
             return `
-              <div class="heatmap-cell ${activeFilter === t ? 'active' : ''}" data-trait="${t}"
-                   style="background:${val > 0 ? traitFillColor(t) : 'var(--bg-4)'};opacity:${val > 0 ? 0.3 + val * 0.7 : 0.3};
-                          padding:6px 4px;border-radius:4px;font-size:10px;text-align:center;cursor:pointer;"
-                   title="${t}: ${val}">
-                ${t.slice(0, 4)}
+              <div class="hm-row">
+                <span class="hm-label ${activeFilter === t ? 'active-filter' : ''}" data-trait="${t}">${t}</span>
+                <div class="hm-bar">
+                  <div class="hm-fill" style="width:${pct}%;background:${color};"></div>
+                </div>
+                <span class="hm-val">${pct}%</span>
               </div>`;
           }).join('')}
-        </div></div>
+        </div>
       </div>`;
   }
 
   renderConnections(connections) {
     if (!connections.length) return '';
+
     return `
       <div class="panel">
         <div class="panel-title"><span class="panel-icon">⬡</span> Top connections</div>
-        <div class="card">
-          ${connections.map(c => `
-            <div class="conn-row" data-deity="${c.id}" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;">
-              <span class="conn-name" style="font-size:12px;min-width:70px;">${c.id}</span>
-              <div class="conn-bar-wrap" style="flex:1;height:4px;background:var(--bg-5);border-radius:2px;">
-                <div class="conn-bar" style="width:${(c.similarity * 100).toFixed(0)}%;height:100%;background:var(--accent);border-radius:2px;"></div>
-              </div>
-              <span class="conn-sim" style="font-size:10px;color:var(--text-3);">${(c.similarity * 100).toFixed(0)}%</span>
-            </div>`).join('')}
+        <div class="card" style="padding:8px 10px;">
+          ${connections.map(c => {
+            const pantheonColor = PANTHEON_COLORS[c.pantheon] || '#888';
+            return `
+              <div class="conn-item" data-deity="${c.id}">
+                <span class="conn-dot" style="background:${pantheonColor}"></span>
+                <div class="conn-info">
+                  <div class="conn-name">${c.id}</div>
+                  <div class="conn-pan">${c.pantheon}</div>
+                </div>
+                <span class="conn-score">${(c.similarity * 100).toFixed(0)}%</span>
+              </div>`;
+          }).join('')}
         </div>
       </div>`;
   }
 
   bindEvents(panel) {
-    panel.querySelectorAll('.heatmap-cell').forEach(cell => {
-      cell.addEventListener('click', () => this.generator.handleTraitClick(cell.dataset.trait));
+    panel.querySelectorAll('.hm-label').forEach(label => {
+      label.addEventListener('click', () => {
+        this.generator.handleTraitClick(label.dataset.trait);
+      });
     });
-    panel.querySelectorAll('.conn-row').forEach(row => {
-      row.addEventListener('click', () => this.generator.loadDeity(row.dataset.deity));
+
+    panel.querySelectorAll('.conn-item').forEach(item => {
+      item.addEventListener('click', () => {
+        this.generator.loadDeity(item.dataset.deity);
+      });
     });
   }
 
   eraLabel(era) {
-    const map = {
-      5: '~2000–1500 BCE',
-      4: '~1500–800 BCE',
-      3: '~800–200 BCE',
-      2: '~200 BCE–500 CE',
-      1: '~500 CE+',
-    };
-    return map[era] || 'Classical period';
+    if (era >= -2000 && era < -1500) return '~2000–1500 BCE';
+    if (era >= -1500 && era < -800) return '~1500–800 BCE';
+    if (era >= -800 && era < -100) return '~800–200 BCE';
+    if (era >= -100 && era < 500) return '~200 BCE–500 CE';
+    if (era >= 500) return '~500 CE+';
+    return 'Classical period';
   }
 
   clear() {

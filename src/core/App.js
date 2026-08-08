@@ -19,6 +19,7 @@ import { GraphControls } from '../components/GraphControls.js';
 import { Legend } from '../components/Legend.js';
 import { CompareModal } from '../components/CompareModal.js';
 import { PathStrip } from '../components/PathStrip.js';
+import { MethodologyModal } from '../components/MethodologyModal.js';
 
 export class App {
   constructor(store) {

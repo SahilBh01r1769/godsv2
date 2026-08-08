@@ -1,27 +1,22 @@
-/* ─────────────────────────────────────────────────────────────────
-   views/GraphView.js — D3 force-directed graph (v2 modular)
-   ───────────────────────────────────────────────────────────────── */
-
 import { PANTHEON_COLORS } from '../data/deities.js';
-import { edgeColor, traitVector, sharedTraits } from '../utils/similarity.js';
+import { edgeColor } from '../utils/similarity.js';
 import { getCognate } from '../data/cognates.js';
 import { STATE_KEYS } from '../utils/store.js';
 
 export class GraphView {
   constructor(store, generator, feedback) {
-    this.store     = store;
+    this.store = store;
     this.generator = generator;
-    this.feedback  = feedback;
-
-    this.svg       = null;
-    this.zoom      = null;
-    this.gLinks    = null;
-    this.gNodes    = null;
+    this.feedback = feedback;
+    this.svg = null;
+    this.zoom = null;
+    this.gLinks = null;
+    this.gNodes = null;
     this.simulation = null;
-    this.tooltip   = null;
+    this.tooltip = null;
+    this.currentNodes = [];
   }
 
-  /* ── Mount ─────────────────────────────────────────────────────── */
   mount(svgElement) {
     this.svg = d3.select(svgElement);
 
@@ -39,7 +34,6 @@ export class GraphView {
     this.gLinks = this.svg.append('g').attr('class', 'g-links');
     this.gNodes = this.svg.append('g').attr('class', 'g-nodes');
 
-    // Tooltip
     this.tooltip = d3.select('body').append('div')
       .attr('class', 'graph-tooltip')
       .style('opacity', 0)
@@ -52,7 +46,6 @@ export class GraphView {
     });
   }
 
-  /* ── Subscriptions ─────────────────────────────────────────────── */
   setupSubscriptions() {
     this.store.subscribe(STATE_KEYS.GRAPH_DATA, data => {
       this.render(data.nodes, data.edges);
@@ -68,11 +61,9 @@ export class GraphView {
     });
   }
 
-  /* ── Dimensions ────────────────────────────────────────────────── */
-  W() { return document.getElementById('graph-view')?.clientWidth  || 800; }
+  W() { return document.getElementById('graph-view')?.clientWidth || 800; }
   H() { return document.getElementById('graph-view')?.clientHeight || 600; }
 
-  /* ── Main render ───────────────────────────────────────────────── */
   render(nodes, edges, options = {}) {
     if (!this.svg) return;
     const empty = document.getElementById('empty-state');
@@ -81,69 +72,77 @@ export class GraphView {
     if (this.simulation) this.simulation.stop();
 
     const {
-      animate       = this.store.get(STATE_KEYS.ANIMATE_ENTRANCE),
-      showLabels    = this.store.get(STATE_KEYS.SHOW_LABELS),
-      cluster       = this.store.get(STATE_KEYS.CLUSTER_BY_PAN),
-      activeFilter  = this.store.get(STATE_KEYS.ACTIVE_TRAIT_FILTER),
-      showCognates  = this.store.get(STATE_KEYS.SHOW_COGNATES),
+      animate = this.store.get(STATE_KEYS.ANIMATE_ENTRANCE),
+      showLabels = this.store.get(STATE_KEYS.SHOW_LABELS),
+      cluster = this.store.get(STATE_KEYS.CLUSTER_BY_PAN),
+      showCognates = this.store.get(STATE_KEYS.SHOW_COGNATES),
       centerDeityId = this.store.get(STATE_KEYS.SELECTED_DEITY),
     } = options;
 
     if (!nodes.length) {
       this.gLinks.selectAll('*').remove();
       this.gNodes.selectAll('*').remove();
+      this.updateMinimap();
       return;
     }
 
     const W = this.W(), H = this.H();
 
-    // ── Links ──
+    // ── Links with smooth transitions ──
     const link = this.gLinks.selectAll('line.link')
       .data(edges, d => `${d.source.id || d.source}-${d.target.id || d.target}`);
 
-    link.exit().remove();
+    link.exit()
+      .transition()
+      .duration(animate ? 800 : 0)
+      .ease(d3.easeCubicInOut)
+      .attr('stroke-opacity', 0)
+      .remove();
 
     const linkEnter = link.enter().append('line')
       .attr('class', 'link')
-      .attr('stroke-opacity', 0);
+      .attr('stroke-opacity', 0)
+      .attr('stroke-width', 0);
 
     const linkMerge = linkEnter.merge(link)
-      .attr('stroke', d => edgeColor(d.similarity))
+      .attr('stroke', d => edgeColor(d.similarity));
+
+    linkMerge.transition()
+      .duration(animate ? 800 : 0)
+      .ease(d3.easeCubicInOut)
       .attr('stroke-width', d => Math.max(1, d.similarity * 4))
       .attr('stroke-opacity', d => {
-        if (showCognates && getCognate(
-          d.source.id || d.source,
-          d.target.id || d.target
-        )) return 1;
+        if (showCognates && getCognate(d.source.id || d.source, d.target.id || d.target)) return 1;
         return 0.4;
       });
 
-    // ── Nodes ──
+    // ── Nodes with smooth transitions ──
     const node = this.gNodes.selectAll('g.node')
       .data(nodes, d => d.id);
 
     node.exit()
-      .transition().duration(animate ? 300 : 0)
+      .transition()
+      .duration(animate ? 800 : 0)
+      .ease(d3.easeCubicInOut)
       .attr('opacity', 0)
+      .attr('transform', d => `translate(${d.x || 0},${d.y || 0}) scale(0)`)
       .remove();
 
     const nodeEnter = node.enter().append('g')
       .attr('class', 'node')
-      .attr('opacity', animate ? 0 : 1)
+      .attr('opacity', 0)
       .call(d3.drag()
         .on('start', (e, d) => this.dragstarted(e, d))
-        .on('drag',  (e, d) => this.dragged(e, d))
-        .on('end',   (e, d) => this.dragended(e, d))
+        .on('drag', (e, d) => this.dragged(e, d))
+        .on('end', (e, d) => this.dragended(e, d))
       );
 
-    // Circle
     nodeEnter.append('circle')
-      .attr('r', d => d.id === centerDeityId ? 12 : 8)
+      .attr('r', 0)
       .attr('fill', d => PANTHEON_COLORS[d.pantheon] || '#888')
       .attr('stroke', d => d.id === centerDeityId ? '#fff' : 'none')
       .attr('stroke-width', 2);
 
-    // Label
     nodeEnter.append('text')
       .attr('class', 'node-label')
       .attr('dx', 14)
@@ -154,30 +153,40 @@ export class GraphView {
     const nodeMerge = nodeEnter.merge(node);
 
     if (animate) {
-      nodeMerge.transition().duration(400).attr('opacity', 1);
+      nodeMerge.transition()
+        .duration(800)
+        .ease(d3.easeCubicOut)
+        .attr('opacity', 1);
+
+      nodeMerge.select('circle')
+        .transition()
+        .duration(800)
+        .ease(d3.easeElasticOut.amplitude(1).period(0.4))
+        .attr('r', d => d.id === centerDeityId ? 12 : 8);
+    } else {
+      nodeMerge.attr('opacity', 1);
+      nodeMerge.select('circle').attr('r', d => d.id === centerDeityId ? 12 : 8);
     }
 
-    // Events
     nodeMerge
       .on('click', (e, d) => {
         e.stopPropagation();
         this.generator.handleNodeClick(d.id);
       })
       .on('mouseover', (e, d) => this.onNodeHover(e, d))
-      .on('mouseout',  ()    => this.hideTooltip());
+      .on('mouseout', () => this.hideTooltip());
 
     linkMerge
       .on('mouseover', (e, d) => this.onEdgeHover(e, d))
-      .on('mouseout',  ()    => this.hideTooltip());
+      .on('mouseout', () => this.hideTooltip());
 
-    // ── Simulation ──
+    // ── Simulation with smooth clustering ──
     this.simulation = d3.forceSimulation(nodes)
       .force('link', d3.forceLink(edges).id(d => d.id).distance(80))
       .force('charge', d3.forceManyBody().strength(-150))
       .force('center', d3.forceCenter(W / 2, H / 2))
       .force('collision', d3.forceCollide().radius(20));
 
-    // Cluster by pantheon
     if (cluster) {
       const pantheons = [...new Set(nodes.map(n => n.pantheon))];
       const angleStep = (2 * Math.PI) / pantheons.length;
@@ -188,9 +197,12 @@ export class GraphView {
           y: H / 2 + Math.sin(i * angleStep) * 150,
         };
       });
-      this.simulation.force('cluster', d3.forceX(d => clusterCenters[d.pantheon]?.x || W / 2).strength(0.3));
-      this.simulation.force('clusterY', d3.forceY(d => clusterCenters[d.pantheon]?.y || H / 2).strength(0.3));
+      this.simulation
+        .force('cluster', d3.forceX(d => clusterCenters[d.pantheon]?.x || W / 2).strength(0.2))
+        .force('clusterY', d3.forceY(d => clusterCenters[d.pantheon]?.y || H / 2).strength(0.2));
     }
+
+    this.simulation.alpha(1).restart();
 
     this.simulation.on('tick', () => {
       linkMerge
@@ -206,7 +218,6 @@ export class GraphView {
     });
   }
 
-  /* ── Drag handlers ─────────────────────────────────────────────── */
   dragstarted(event, d) {
     if (!event.active) this.simulation.alphaTarget(0.3).restart();
     d.fx = d.x;
@@ -227,7 +238,6 @@ export class GraphView {
     }
   }
 
-  /* ── Tooltip ───────────────────────────────────────────────────── */
   onNodeHover(event, d) {
     const traits = Object.entries(d.traits || {})
       .filter(([, v]) => v > 0)
@@ -243,13 +253,13 @@ export class GraphView {
         <div class="tt-traits">${traits}</div>
       `)
       .style('left', (event.pageX + 12) + 'px')
-      .style('top',  (event.pageY - 10) + 'px');
+      .style('top', (event.pageY - 10) + 'px');
   }
 
   onEdgeHover(event, d) {
     const srcId = d.source.id || d.source;
     const tgtId = d.target.id || d.target;
-    const shared = sharedTraits(srcId, tgtId);
+    const shared = d._shared || d.shared || [];
 
     this.tooltip
       .style('opacity', 1)
@@ -259,14 +269,13 @@ export class GraphView {
         <div class="tt-traits">Shared: ${shared.join(', ')}</div>
       `)
       .style('left', (event.pageX + 12) + 'px')
-      .style('top',  (event.pageY - 10) + 'px');
+      .style('top', (event.pageY - 10) + 'px');
   }
 
   hideTooltip() {
     this.tooltip.style('opacity', 0);
   }
 
-  /* ── Highlight / Clear ─────────────────────────────────────────── */
   highlightByTrait(trait) {
     this.gNodes.selectAll('g.node')
       .attr('opacity', d => (d.traits && d.traits[trait] > 0) ? 1 : 0.15);
@@ -277,7 +286,6 @@ export class GraphView {
     this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, null);
   }
 
-  /* ── Controls ──────────────────────────────────────────────────── */
   setLabelsVisible(show) {
     this.gNodes.selectAll('.node-label')
       .style('display', show ? 'block' : 'none');
@@ -304,24 +312,28 @@ export class GraphView {
   }
 
   updateMinimap() {
-  const canvas = document.getElementById('minimap-canvas');
-  if (!canvas || !this.currentNodes) return;
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  ctx.clearRect(0, 0, W, H);
-  const gw = this.W() || 1, gh = this.H() || 1;
-  this.currentNodes.forEach(n => {
-    if (n.x == null) return;
-    ctx.fillStyle = PANTHEON_COLORS[n.pantheon] || '#888';
-    ctx.beginPath();
-    ctx.arc((n.x / gw) * W, (n.y / gh) * H, 2, 0, Math.PI * 2);
-    ctx.fill();
-  });
-}
+    const canvas = document.getElementById('minimap-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    if (!this.currentNodes || !this.currentNodes.length) return;
+
+    const gw = this.W() || 1, gh = this.H() || 1;
+    this.currentNodes.forEach(n => {
+      if (n.x == null) return;
+      ctx.fillStyle = PANTHEON_COLORS[n.pantheon] || '#888';
+      ctx.beginPath();
+      ctx.arc((n.x / gw) * W, (n.y / gh) * H, 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
 
   clearGraph() {
     if (this.simulation) this.simulation.stop();
     this.gLinks.selectAll('*').remove();
     this.gNodes.selectAll('*').remove();
+    this.updateMinimap();
   }
 }
