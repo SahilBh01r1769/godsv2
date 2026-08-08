@@ -67,7 +67,7 @@ export class GraphControls {
         <div class="control-group">
           <button class="btn btn-sm btn-ghost" id="export-json-btn" title="Export JSON">↓ JSON</button>
           <button class="btn btn-sm btn-ghost" id="export-svg-btn" title="Export SVG">↓ SVG</button>
-          <button class="btn btn-sm btn-ghost" id="methodology-btn" title="How calculations work">? Method</button>
+          <button class="btn btn-sm btn-ghost" id="methodology-btn" title="How calculations work">? Methodology</button>
         </div>
       </div>`;
 
@@ -126,14 +126,6 @@ export class GraphControls {
       this._regenTimer = setTimeout(() => this._autoRegenerate(), 400);
     });
 
-    const eraLabels = ['All', '500 CE', '200 BCE', '800 BCE', '1500 BCE', '2000 BCE'];
-    $('era-sl')?.addEventListener('input', e => {
-      const value = parseInt(e.target.value);
-      this.store.set(STATE_KEYS.ERA_FILTER, value);
-      $('era-val').textContent = eraLabels[value];
-      clearTimeout(this._regenTimer);
-      this._regenTimer = setTimeout(() => this._autoRegenerate(), 400);
-    });
 
     $('cluster-cb')?.addEventListener('change', e => {
       this.store.set(STATE_KEYS.CLUSTER_BY_PAN, e.target.checked);
@@ -162,6 +154,26 @@ export class GraphControls {
         this.store.set(STATE_KEYS.COMPARE_B, null);
         this.store.set(STATE_KEYS.UI_TOAST, 'Compare mode: click two deities');
       }
+
+        $('path-btn')?.addEventListener('click', () => {
+      const mode = this.store.get(STATE_KEYS.MODE);
+      if (mode === 'path') {
+        this.store.set(STATE_KEYS.MODE, 'explore');
+        $('path-btn').classList.remove('btn-active');
+        this.store.set(STATE_KEYS.PATH_FROM, null);
+        this.store.set(STATE_KEYS.PATH_TO, null);
+        this.store.set(STATE_KEYS.UI_TOAST, 'Path mode off');
+      } else {
+        this.store.set(STATE_KEYS.MODE, 'path');
+        $('path-btn').classList.add('btn-active');
+        $('compare-btn')?.classList.remove('btn-active');
+        this.store.set(STATE_KEYS.PATH_FROM, null);
+        this.store.set(STATE_KEYS.PATH_TO, null);
+        this.store.set(STATE_KEYS.COMPARE_A, null);
+        this.store.set(STATE_KEYS.COMPARE_B, null);
+        this.store.set(STATE_KEYS.UI_TOAST, 'Path mode: click two deities');
+      }
+    });
     });
 
     $('cognate-btn')?.addEventListener('click', () => {

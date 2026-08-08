@@ -22,14 +22,6 @@ export const TRAITS = [
   'Fire',
 ];
 
-// Approximate earliest widespread attestation (negative = BCE)
-export const ERAS = [
-  { id: -2000, label: '~2000–1500 BCE', short: '2000 BCE' },
-  { id: -1500, label: '~1500–800 BCE',  short: '1500 BCE' },
-  { id: -800,  label: '~800–200 BCE',   short: '800 BCE'  },
-  { id: -100,  label: '~200 BCE–500 CE',short: '200 BCE'  },
-  { id: 800,   label: '~500–1200 CE',   short: '500 CE'   },
-];
 
 export const PANTHEON_COLORS = {
   Greek:         '#4a9eff',
@@ -86,7 +78,7 @@ export const DEITIES = [
     id: 'Ares', pantheon: 'Greek', era: -800,
     originalScript: 'Ἄρης',
     epithet: 'God of War, Slaughter',
-    desc: "Personification of violent, chaotic warfare — contrasted with Athena’s strategic warfare. One of the least popular Olympians in Greek cult. Roman equivalent: Mars (who had a more positive, agrarian aspect).'S strategic warfare. One of the least popular Olympian gods in Greek culture.",
+    desc: 'Personification of violent, chaotic warfare — contrasted with Athena\'s strategic warfare. One of the least popular Olympians in Greek cult. Roman equivalent: Mars (who had a more positive, agrarian aspect).',
     traits: {
       'War / victory': .95, 'Ecstasy / madness': .6,
       wilderness: .4, 'Disease sender': .3,
@@ -188,7 +180,7 @@ export const DEITIES = [
     id: 'Hera', pantheon: 'Greek', era: -800,
     originalScript: 'Ἥρα',
     epithet: 'Queen of Olympus, Goddess of Marriage',
-    desc: "Queen of the gods and goddess of marriage and childbirth. Her constant jealousy of Zeus’s affairs drives many mythological cycles. Roman Juno.'S affairs drives many mythological cycles.",
+    desc: 'Queen of the gods and goddess of marriage and childbirth. Her constant jealousy of Zeus\'s affairs drives many mythological cycles. Roman Juno.',
     traits: { fertility: .8, 'War / victory': .4, 'Ascetic / wisdom': .4, 'Storm god': .3 },
     domains: ["Marriage", "Queenship", "Childbirth", "Women"],
     symbols: ["Peacock", "Diadem", "Pomegranate", "Cow"],
@@ -325,7 +317,7 @@ export const DEITIES = [
     id: 'Odin', pantheon: 'Norse', era: 800,
     originalScript: 'Óðinn',
     epithet: 'Allfather, God of the Gallows, Wanderer',
-    desc: "Chief of the Aesir. Sovereign magic-wielder, seeker of wisdom (sacrificed an eye), god of war and of the hanged. Strong functional parallel with Vedic Varuna as binding sovereign and with aspects of Hermes as psychopomp and boundary-crosser.'S well for wisdom, and hung for nine days on Yggdrasil to learn the runes. God of war, death, poetry, and magic. His parallel with Vedic Varuna is one of the most discussed in comparative mythology.",
+    desc: 'Chief of the Aesir. Sovereign magic-wielder who sacrificed an eye at Mimir\'s well and hung for nine days on Yggdrasil to learn the runes. God of war, death, poetry, and magic. Strong functional parallel with Vedic Varuna as binding sovereign and with Hermes as psychopomp and boundary-crosser.',
     traits: {
       'Ascetic / wisdom': .95, 'War / victory': .8,
       'Death / underworld': .7, trickster: .6,
@@ -630,7 +622,7 @@ export const DEITIES = [
     id: 'Mokosh', pantheon: 'Slavic', era: -100,
     originalScript: 'Мокошь',
     epithet: 'Moist Earth Mother, Goddess of Fate',
-    desc: "Slavic earth and fertility goddess, protector of women and of spinning/weaving. One of the few clearly female deities retained in the later Slavic pantheon after Christianization.'S crafts. Parallels with Freya and various earth-mother archetypes.",
+    desc: 'Slavic earth and fertility goddess, protector of women and of spinning/weaving. One of the few clearly female deities retained in the later Slavic pantheon after Christianization. Parallels with Freya and various earth-mother archetypes.',
     traits: {
       fertility: .9, 'Sea / water': .5,
       healer: .6, 'Ascetic / wisdom': .4, wilderness: .3,

@@ -83,7 +83,12 @@ export class App {
     this.store.subscribe(STATE_KEYS.UI_TOAST, msg => { if (msg) this.feedback.toast(msg); });
     this.store.subscribe(STATE_KEYS.UI_LOADING, v => this.feedback.showLoading(v));
     this.store.subscribe(STATE_KEYS.UI_STATUS, msg => this.feedback.setStatus(msg));
-
+    
+    this.store.subscribe(STATE_KEYS.SELECTED_DEITY, id => {
+      if (id) this.surprising.render(id);
+      else this.surprising.hide();
+    });
+    
     // Sidebar tabs (same pattern as original inline script)
     const setSidebarTab = (tab) => {
       ['info', 'tours'].forEach(t => {

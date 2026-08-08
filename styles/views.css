@@ -466,36 +466,6 @@
   margin-bottom: 2px;
 }
 
-/* Compare modal grid */
-.compare-trait-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-  font-size: 11px;
-}
-
-.compare-bar-wrap {
-  flex: 1;
-  height: 8px;
-  background: var(--bg-5);
-  border-radius: var(--r-sm);
-  overflow: hidden;
-}
-
-.compare-bar {
-  height: 100%;
-  border-radius: var(--r-sm);
-  transition: width .4s ease;
-}
-
-.compare-trait-name {
-  min-width: 100px;
-  text-align: center;
-  font-size: 10px;
-  color: var(--text-2);
-  flex-shrink: 0;
-}
 
 /* ── Responsive adjustments ─────────────────────────────────────── */
 @media (max-width: 768px) {
