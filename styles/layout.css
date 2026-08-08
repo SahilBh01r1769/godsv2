@@ -475,3 +475,6 @@
 
   .header-logo span { display: none; }
 }
+
+/* Scrollable non-graph views */
+#matrix-view, #archetypes-view { overflow-y: auto; }

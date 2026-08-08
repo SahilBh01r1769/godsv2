@@ -1,9 +1,8 @@
 /* ─────────────────────────────────────────────────────────────────
-   core/Generator.js — Graph generation + worker orchestration
-   All business logic lives here. No DOM manipulation.
+   core/Generator.js — Graph generation + worker orchestration (v2)
+   Matches the actual workerClient API
    ───────────────────────────────────────────────────────────────── */
-
-import { getDeityById, sharedTraits, traitVector } from '../utils/similarity.js';
+import { getDeityById } from '../utils/similarity.js';
 import { workerClient } from '../utils/workerClient.js';
 import { STATE_KEYS } from '../utils/store.js';
 import { DEITIES } from '../data/deities.js';
@@ -29,8 +28,6 @@ export class Generator {
 
     this.store.set(STATE_KEYS.SELECTED_DEITY, deity.id);
     this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, null);
-
-    // Switch to graph view
     this.store.set(STATE_KEYS.CURRENT_VIEW, 'graph');
 
     await this.generate();
@@ -43,33 +40,51 @@ export class Generator {
     this.store.set(STATE_KEYS.UI_LOADING, true);
 
     try {
-      const metric    = this.store.get(STATE_KEYS.SIMILARITY_METHOD);
-      const threshold = this.store.get(STATE_KEYS.GRAPH_THRESHOLD);
-      const linkMode  = this.store.get(STATE_KEYS.LINK_MODE);
-      const eraFilter = this.store.get(STATE_KEYS.ERA_FILTER);
+      const deity      = getDeityById(deityId);
+      const metric     = this.store.get(STATE_KEYS.SIMILARITY_METHOD) || 'cosine';
+      const threshold  = this.store.get(STATE_KEYS.GRAPH_THRESHOLD)  || 0.35;
+      const linkMode   = this.store.get(STATE_KEYS.LINK_MODE)        || 'top5';
+      const eraFilter  = this.store.get(STATE_KEYS.ERA_FILTER)       || 0;
 
-      // Call the Web Worker
-      const result = await workerClient.getConnections({
-        deityId,
-        metric,
-        threshold,
-        linkMode,
-        eraFilter,
-        allDeities: DEITIES,
-      });
+      // ── Filter deities by era before sending to worker ──
+      // ERA_FILTER: 0=all, 5=2000 BCE, 4=1500 BCE, 3=800 BCE, 2=200 BCE, 1=500 CE
+      const eraMap = { 5: -2000, 4: -1500, 3: -800, 2: -100, 1: 800 };
+      let candidateDeities = DEITIES;
+      if (eraFilter > 0) {
+        const cutoff = eraMap[eraFilter];
+        candidateDeities = DEITIES.filter(d => d.era >= cutoff);
+      }
 
-      // Update store — this triggers GraphView, Sidebar, etc. automatically
-      this.store.set(STATE_KEYS.GRAPH_DATA, {
-        nodes: result.nodes,
-        edges: result.edges,
-      });
+      // ── Call the worker with correct positional args ──
+      const connections = await workerClient.getConnections(
+        deity,              // full deity object, not id
+        candidateDeities,   // array of deities to compare against
+        metric,             // 'cosine' | 'overlap'
+        threshold           // 0..1
+      );
 
-      const statusMsg = `${result.nodes.length} deities · ${result.edges.length} connections`;
-      this.store.set(STATE_KEYS.UI_STATUS, statusMsg);
+      // ── Apply linkMode (top5 / top10 / all) ──
+      // Worker returns sorted by score desc already
+      let limited;
+      if (linkMode === 'top5')       limited = connections.slice(0, 5);
+      else if (linkMode === 'top10') limited = connections.slice(0, 10);
+      else                           limited = connections;
+
+      // ── Transform flat array into { nodes, edges } shape ──
+      const nodes = [deity, ...limited.map(c => c.deity)];
+      const edges = limited.map(c => ({
+        source: deity.id,
+        target: c.deity.id,
+        similarity: c.score,
+        shared: c.shared,
+      }));
+
+      this.store.set(STATE_KEYS.GRAPH_DATA, { nodes, edges });
+      this.store.set(STATE_KEYS.UI_STATUS, `${nodes.length} deities · ${edges.length} connections`);
 
     } catch (err) {
       console.error('[Generator] Error:', err);
-      this.store.set(STATE_KEYS.UI_TOAST, 'Error computing network');
+      this.store.set(STATE_KEYS.UI_TOAST, 'Error: ' + err.message);
     } finally {
       this.store.set(STATE_KEYS.UI_LOADING, false);
     }
@@ -100,7 +115,6 @@ export class Generator {
       } else {
         this.store.set(STATE_KEYS.COMPARE_B, nodeId);
         this.store.set(STATE_KEYS.MODE, 'explore');
-        // Open compare modal
         document.getElementById('compare-modal')?.classList.add('open');
       }
       return;
@@ -130,5 +144,25 @@ export class Generator {
   handleTraitClick(trait) {
     this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, trait);
     this.generate();
+  }
+
+  async findPath(fromId, toId) {
+    this.store.set(STATE_KEYS.UI_LOADING, true);
+    try {
+      const path = await workerClient.findPath(
+        fromId, toId, DEITIES,
+        this.store.get(STATE_KEYS.SIMILARITY_METHOD),
+        this.store.get(STATE_KEYS.GRAPH_THRESHOLD)
+      );
+      if (path) {
+        this.store.set(STATE_KEYS.UI_TOAST, `Path: ${path.join(' → ')}`);
+      } else {
+        this.store.set(STATE_KEYS.UI_TOAST, 'No path found between those deities.');
+      }
+    } catch (err) {
+      this.store.set(STATE_KEYS.UI_TOAST, 'Path error: ' + err.message);
+    } finally {
+      this.store.set(STATE_KEYS.UI_LOADING, false);
+    }
   }
 }

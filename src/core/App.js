@@ -1,9 +1,4 @@
-/* ─────────────────────────────────────────────────────────────────
-   core/App.js — Application orchestrator (v2 modular)
-   Replaces the old monolithic app.js
-   ───────────────────────────────────────────────────────────────── */
-
-import { DEITIES, PANTHEON_COLORS, TRAITS } from '../data/deities.js';
+import { DEITIES } from '../data/deities.js';
 import { TOURS } from '../data/tours.js';
 import { STATE_KEYS } from '../utils/store.js';
 
@@ -29,18 +24,15 @@ export class App {
   constructor(store) {
     this.store = store;
 
-    // Core services
     this.feedback  = new FeedbackUI();
     this.router    = new Router(store);
     this.generator = new Generator(store, this.feedback);
 
-    // Views
     this.graphView      = new GraphView(store, this.generator, this.feedback);
     this.matrixView     = new MatrixView(store, this.generator);
     this.archetypesView = new ArchetypesView(store, this.generator);
     this.mapView        = new MapView(store, this.generator);
 
-    // Components
     this.sidebar       = new Sidebar(store, this.generator, this.feedback);
     this.searchBar     = new SearchBar(store, this.generator);
     this.tours         = new Tours(store, this.generator, this.feedback);
@@ -52,26 +44,27 @@ export class App {
   }
 
   start() {
-    // 1. Seed data
     this.store.set(STATE_KEYS.DEITIES, DEITIES);
     this.store.set(STATE_KEYS.TOURS, TOURS);
 
-    // 2. Mount components
+    // Mount
     this.graphView.mount(document.getElementById('graph-svg'));
     this.matrixView.mount(document.getElementById('matrix-view'));
     this.archetypesView.mount(document.getElementById('archetypes-view'));
     this.mapView.mount(document.getElementById('map-view'));
 
-    this.sidebar.mount(document.getElementById('sidebar'));
+    this.sidebar.mount();
     this.searchBar.mount(document.getElementById('search-wrap'));
     this.tours.mount(document.getElementById('stab-tours-content'));
     this.surprising.mount(document.getElementById('surprising-panel'));
     this.graphControls.mount(document.getElementById('graph-controls'));
-    this.legend.mount(document.getElementById('graph-view'));
     this.compareModal.mount(document.getElementById('compare-modal'));
     this.pathStrip.mount(document.getElementById('path-strip'));
 
-    // 3. Wire subscriptions
+    const legendHost = document.getElementById('graph-view');
+    if (legendHost) this.legend.mount(legendHost);
+
+    // Subscriptions
     this.router.setup();
     this.graphView.setupSubscriptions();
     this.matrixView.setupSubscriptions();
@@ -81,32 +74,38 @@ export class App {
     this.tours.setupSubscriptions();
     this.graphControls.setupSubscriptions();
 
-    // 4. Build search index
     this.searchBar.buildIndex(DEITIES);
 
-    // 5. Global UI subscriptions
-    this.store.subscribe(STATE_KEYS.UI_TOAST, msg => {
-      if (msg) this.feedback.toast(msg);
-    });
-    this.store.subscribe(STATE_KEYS.UI_LOADING, isLoading => {
-      this.feedback.showLoading(isLoading);
-    });
-    this.store.subscribe(STATE_KEYS.UI_STATUS, msg => {
-      this.feedback.setStatus(msg);
-    });
+    // Global UI
+    this.store.subscribe(STATE_KEYS.UI_TOAST, msg => { if (msg) this.feedback.toast(msg); });
+    this.store.subscribe(STATE_KEYS.UI_LOADING, v => this.feedback.showLoading(v));
+    this.store.subscribe(STATE_KEYS.UI_STATUS, msg => this.feedback.setStatus(msg));
 
-    // 6. Sidebar tab switching
+    // Sidebar tabs (same pattern as original inline script)
+    const setSidebarTab = (tab) => {
+      ['info', 'tours'].forEach(t => {
+        const btn  = document.getElementById(`stab-${t}`);
+        const cont = document.getElementById(`stab-${t}-content`);
+        if (btn)  btn.classList.toggle('active', t === tab);
+        if (cont) cont.style.display = (t === tab) ? '' : 'none';
+      });
+    };
     document.getElementById('sidebar-tabs')?.addEventListener('click', e => {
-      const btn = e.target.closest('.stab');
-      if (!btn) return;
-      const tab = btn.dataset.tab;
-      document.querySelectorAll('#sidebar-tabs .stab').forEach(b =>
-        b.classList.toggle('active', b.dataset.tab === tab)
-      );
-      document.querySelectorAll('.stab-content').forEach(c => c.classList.remove('active'));
-      document.getElementById(`stab-${tab}-content`)?.classList.add('active');
+      const btn = e.target.closest('[data-tab]');
+      if (btn) setSidebarTab(btn.dataset.tab);
     });
 
-    console.log('[App] Modular architecture initialized.');
+    // Graph control events
+    window.addEventListener('graph:zoomIn',    () => this.graphView.zoomIn());
+    window.addEventListener('graph:zoomOut',   () => this.graphView.zoomOut());
+    window.addEventListener('graph:resetZoom', () => this.graphView.resetZoom());
+    window.addEventListener('graph:unpinAll',  () => {
+      this.graphView.unpinAll(this.store.get(STATE_KEYS.GRAPH_DATA).nodes);
+    });
+
+    const loader = document.getElementById('loader');
+    if (loader) loader.classList.add('hidden');
+
+    console.log('[App] Initialized.');
   }
 }

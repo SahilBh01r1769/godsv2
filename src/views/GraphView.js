@@ -44,6 +44,12 @@ export class GraphView {
       .attr('class', 'graph-tooltip')
       .style('opacity', 0)
       .style('pointer-events', 'none');
+
+    document.querySelectorAll('.empty-tag').forEach(tag => {
+      tag.addEventListener('click', () =>
+        this.generator.loadDeity(tag.dataset.deity, { resetGraph: true })
+      );
+    });
   }
 
   /* ── Subscriptions ─────────────────────────────────────────────── */
@@ -69,6 +75,9 @@ export class GraphView {
   /* ── Main render ───────────────────────────────────────────────── */
   render(nodes, edges, options = {}) {
     if (!this.svg) return;
+    const empty = document.getElementById('empty-state');
+    if (empty) empty.style.display = nodes.length ? 'none' : 'flex';
+    this.currentNodes = nodes;
     if (this.simulation) this.simulation.stop();
 
     const {
@@ -295,11 +304,20 @@ export class GraphView {
   }
 
   updateMinimap() {
-    // Simplified minimap update
-    const mmSvg = document.getElementById('minimap-svg');
-    if (!mmSvg) return;
-    // ... your existing minimap logic ...
-  }
+  const canvas = document.getElementById('minimap-canvas');
+  if (!canvas || !this.currentNodes) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const gw = this.W() || 1, gh = this.H() || 1;
+  this.currentNodes.forEach(n => {
+    if (n.x == null) return;
+    ctx.fillStyle = PANTHEON_COLORS[n.pantheon] || '#888';
+    ctx.beginPath();
+    ctx.arc((n.x / gw) * W, (n.y / gh) * H, 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
 
   clearGraph() {
     if (this.simulation) this.simulation.stop();
