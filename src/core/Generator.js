@@ -1,4 +1,8 @@
-import { getDeityById } from '../utils/similarity.js';
+/* ─────────────────────────────────────────────────────────────────
+   core/Generator.js — Graph generation + worker orchestration (v2)
+   Matches the actual workerClient API
+   ───────────────────────────────────────────────────────────────── */
+import { getDeityById, computeSimilarity } from '../utils/similarity.js';
 import { workerClient } from '../utils/workerClient.js';
 import { STATE_KEYS } from '../utils/store.js';
 import { DEITIES } from '../data/deities.js';
@@ -7,6 +11,7 @@ export class Generator {
   constructor(store, feedback) {
     this.store = store;
     this.feedback = feedback;
+    this.currentGenerationId = 0; // FIX 1: Race condition tracker
   }
 
   async loadDeity(nameOrId, options = {}) {
@@ -23,81 +28,99 @@ export class Generator {
     }
 
     this.store.set(STATE_KEYS.SELECTED_DEITY, deity.id);
-    this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, null);
+    this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, null); // Clear archetype filter
     this.store.set(STATE_KEYS.CURRENT_VIEW, 'graph');
 
     await this.generate();
   }
 
-  _normalizeMetric(metric) {
-    const map = { cosine: 'cosine', overlap: 'overlap', jaccard: 'overlap', euclidean: 'cosine' };
-    return map[metric] || 'cosine';
-  }
-
   async generate() {
     const deityId = this.store.get(STATE_KEYS.SELECTED_DEITY);
-    if (!deityId) return;
+    const activeTrait = this.store.get(STATE_KEYS.ACTIVE_TRAIT_FILTER);
+    
+    if (!deityId && !activeTrait) return;
 
+    const genId = ++this.currentGenerationId; // FIX 1: Increment generation ID
     this.store.set(STATE_KEYS.UI_LOADING, true);
 
     try {
-      const deity      = getDeityById(deityId);
-      const rawMetric  = this.store.get(STATE_KEYS.SIMILARITY_METHOD) || 'cosine';
-      const metric     = this._normalizeMetric(rawMetric);
+      const metric     = this.store.get(STATE_KEYS.SIMILARITY_METHOD) || 'cosine';
       const threshold  = this.store.get(STATE_KEYS.GRAPH_THRESHOLD)  || 0.35;
       const linkMode   = this.store.get(STATE_KEYS.LINK_MODE)        || 'top5';
+      const eraFilter  = this.store.get(STATE_KEYS.ERA_FILTER)       || 0;
 
-      const existing = this.store.get(STATE_KEYS.GRAPH_DATA);
-      const existingNodes = existing.nodes || [];
-      const existingEdges = existing.edges || [];
-
-      const connections = await workerClient.getConnections(
-        deity,
-        DEITIES,
-        metric,
-        threshold
-      );
-
-      // Apply linkMode with cap
-      let limited;
-      if (linkMode === 'top5')       limited = connections.slice(0, 5);
-      else if (linkMode === 'top10') limited = connections.slice(0, 10);
-      else                           limited = connections.slice(0, 30); // Cap "all" at 30
-
-      const newEdges = [];
-      const edgeKeys = new Set(existingEdges.map(e => `${e.source}-${e.target}`));
-
-      limited.forEach(c => {
-        const key = `${deityId}-${c.deity.id}`;
-        const reverseKey = `${c.deity.id}-${deityId}`;
-        if (!edgeKeys.has(key) && !edgeKeys.has(reverseKey)) {
-          newEdges.push({
-            source: deityId,
-            target: c.deity.id,
-            similarity: c.score,
-            shared: c.shared,
-          });
-        }
-      });
-
-      const existingNodeIds = new Set(existingNodes.map(n => n.id));
-      const newNodes = limited
-        .filter(c => !existingNodeIds.has(c.deity.id))
-        .map(c => c.deity);
-
-      if (!existingNodeIds.has(deityId)) {
-        newNodes.unshift(deity);
+      const eraMap = { 5: -2000, 4: -1500, 3: -800, 2: -100, 1: 800 };
+      let candidateDeities = DEITIES;
+      if (eraFilter > 0) {
+        const cutoff = eraMap[eraFilter];
+        candidateDeities = DEITIES.filter(d => d.era >= cutoff);
       }
 
-      const mergedNodes = [...existingNodes, ...newNodes];
-      const mergedEdges = [...existingEdges, ...newEdges];
+      if (activeTrait) {
+        // ── ARCHETYPE MODE (FIX 2) ──
+        const tNorm = activeTrait.toLowerCase().replace(/\s*\/\s*/g, ' / ').trim();
+        
+        const matchingDeities = candidateDeities.filter(d => {
+          if (!d.traits) return false;
+          return Object.keys(d.traits).some(k => {
+            const kNorm = k.toLowerCase().replace(/\s*\/\s*/g, ' / ').trim();
+            return kNorm === tNorm && d.traits[k] > 0.2;
+          });
+        });
 
-      this.store.set(STATE_KEYS.GRAPH_DATA, {
-        nodes: mergedNodes,
-        edges: mergedEdges,
-      });
+        // Abort if a newer request was made while filtering
+        if (genId !== this.currentGenerationId) return;
 
-      this.store.set(STATE_KEYS.UI_STATUS, `${mergedNodes.length} deities · ${mergedEdges.length} connections`);
+        const nodes = matchingDeities;
+        const edges = [];
+
+        // Compute edges between ALL matching deities
+        for (let i = 0; i < matchingDeities.length; i++) {
+          for (let j = i + 1; j < matchingDeities.length; j++) {
+            const a = matchingDeities[i];
+            const b = matchingDeities[j];
+            const score = computeSimilarity(a, b, metric);
+            if (score >= threshold) {
+              edges.push({
+                source: a.id,
+                target: b.id,
+                similarity: score,
+                shared: [],
+              });
+            }
+          }
+        }
+
+        this.store.set(STATE_KEYS.GRAPH_DATA, { nodes, edges });
+        this.store.set(STATE_KEYS.UI_STATUS, `${nodes.length} deities · ${edges.length} connections (Archetype: ${activeTrait})`);
+
+      } else {
+        // ── NORMAL MODE ──
+        const deity = getDeityById(deityId);
+        
+        const connections = await workerClient.getConnections(
+          deity, candidateDeities, metric, threshold
+        );
+
+        // FIX 1: Abort outdated worker responses
+        if (genId !== this.currentGenerationId) return;
+
+        let limited;
+        if (linkMode === 'top5')       limited = connections.slice(0, 5);
+        else if (linkMode === 'top10') limited = connections.slice(0, 10);
+        else                           limited = connections;
+
+        const nodes = [deity, ...limited.map(c => c.deity)];
+        const edges = limited.map(c => ({
+          source: deity.id,
+          target: c.deity.id,
+          similarity: c.score,
+          shared: c.shared,
+        }));
+
+        this.store.set(STATE_KEYS.GRAPH_DATA, { nodes, edges });
+        this.store.set(STATE_KEYS.UI_STATUS, `${nodes.length} deities · ${edges.length} connections`);
+      }
 
     } catch (err) {
       console.error('[Generator] Error:', err);
@@ -110,6 +133,7 @@ export class Generator {
   clearGraph() {
     this.store.set(STATE_KEYS.GRAPH_DATA, { nodes: [], edges: [] });
     this.store.set(STATE_KEYS.SELECTED_DEITY, null);
+    this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, null);
     this.store.set(STATE_KEYS.PINNED_NODES, new Set());
     this.store.set(STATE_KEYS.UI_STATUS, '');
   }
@@ -120,40 +144,44 @@ export class Generator {
     this.store.set(STATE_KEYS.UI_TOAST, `✦ ${d.id} — ${d.epithet}`);
   }
 
-    handleNodeClick(nodeId) {
-      const mode = this.store.get(STATE_KEYS.MODE);
-      const expandOnClick = this.store.get(STATE_KEYS.EXPAND_ON_CLICK);
+  handleNodeClick(nodeId) {
+    const mode = this.store.get(STATE_KEYS.MODE);
+    const expandOnClick = this.store.get(STATE_KEYS.EXPAND_ON_CLICK);
 
-      if (mode === 'compare') {
-        const a = this.store.get(STATE_KEYS.COMPARE_A);
-        if (!a) {
-          this.store.set(STATE_KEYS.COMPARE_A, nodeId);
-          this.store.set(STATE_KEYS.UI_TOAST, `Selected ${nodeId}. Pick a second deity.`);
-        } else {
-          this.store.set(STATE_KEYS.COMPARE_B, nodeId);
-          this.store.set(STATE_KEYS.MODE, 'explore');
-        }
-        return;
+    if (mode === 'compare') {
+      const a = this.store.get(STATE_KEYS.COMPARE_A);
+      if (!a) {
+        this.store.set(STATE_KEYS.COMPARE_A, nodeId);
+        this.store.set(STATE_KEYS.UI_TOAST, `Selected ${nodeId}. Pick a second deity.`);
+      } else {
+        this.store.set(STATE_KEYS.COMPARE_B, nodeId);
+        this.store.set(STATE_KEYS.MODE, 'explore');
+        document.getElementById('compare-modal')?.classList.add('open');
       }
-
-      if (mode === 'path') {
-        const from = this.store.get(STATE_KEYS.PATH_FROM);
-        if (!from) {
-          this.store.set(STATE_KEYS.PATH_FROM, nodeId);
-          this.store.set(STATE_KEYS.UI_TOAST, `Path start: ${nodeId}. Pick destination.`);
-        } else {
-          this.store.set(STATE_KEYS.PATH_TO, nodeId);
-          this.store.set(STATE_KEYS.MODE, 'explore');
-          this.findPath(from, nodeId);
-        }
-        return;
-      }
-
-      this.store.set(STATE_KEYS.SELECTED_DEITY, nodeId);
-      if (expandOnClick) {
-        this.generate();
-      }
+      return;
     }
+
+    if (mode === 'path') {
+      const from = this.store.get(STATE_KEYS.PATH_FROM);
+      if (!from) {
+        this.store.set(STATE_KEYS.PATH_FROM, nodeId);
+        this.store.set(STATE_KEYS.UI_TOAST, `Path start: ${nodeId}. Pick destination.`);
+      } else {
+        this.store.set(STATE_KEYS.PATH_TO, nodeId);
+        this.store.set(STATE_KEYS.MODE, 'explore');
+      }
+      return;
+    }
+
+    // Explore mode
+    if (expandOnClick) {
+      this.store.set(STATE_KEYS.SELECTED_DEITY, nodeId);
+      this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, null); // Clear archetype filter
+      this.generate();
+    } else {
+      this.store.set(STATE_KEYS.SELECTED_DEITY, nodeId);
+    }
+  }
 
   handleTraitClick(trait) {
     this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, trait);
@@ -165,13 +193,13 @@ export class Generator {
     try {
       const path = await workerClient.findPath(
         fromId, toId, DEITIES,
-        this._normalizeMetric(this.store.get(STATE_KEYS.SIMILARITY_METHOD)),
+        this.store.get(STATE_KEYS.SIMILARITY_METHOD),
         this.store.get(STATE_KEYS.GRAPH_THRESHOLD)
       );
       if (path) {
         this.store.set(STATE_KEYS.UI_TOAST, `Path: ${path.join(' → ')}`);
       } else {
-        this.store.set(STATE_KEYS.UI_TOAST, 'No path found.');
+        this.store.set(STATE_KEYS.UI_TOAST, 'No path found between those deities.');
       }
     } catch (err) {
       this.store.set(STATE_KEYS.UI_TOAST, 'Path error: ' + err.message);
