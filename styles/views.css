@@ -539,3 +539,48 @@ input[type="range"]::-webkit-slider-runnable-track {
   background: transparent !important;
   border: none !important;
 }
+
+/* ── Archetype Dossier: sticky summary + scrolling spread ───────── */
+.dossier { display:grid; grid-template-columns:300px minmax(0,1fr); gap:18px; align-items:start; max-width:1150px; }
+.dossier-aside { position:sticky; top:10px; background:var(--bg-3); border:1px solid var(--border-1); border-radius:var(--r-lg); padding:14px; }
+.dossier-top { display:flex; justify-content:space-between; gap:8px; margin-bottom:12px; }
+.dossier-header { display:flex; align-items:center; gap:12px; }
+.dossier-icon { font-size:38px; filter:drop-shadow(0 0 12px rgba(255,255,255,.18)); }
+.dossier-stats { display:flex; gap:8px; margin:12px 0; }
+.side-stat { flex:1; background:var(--bg-4); border:1px solid var(--border-1); border-radius:var(--r-md); padding:8px 6px; text-align:center; }
+.side-stat-num { font-family:var(--font-mono); font-size:14px; color:var(--text-0); font-weight:700; }
+.side-stat-label { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); margin-top:2px; }
+.side-stat-row { display:flex; gap:8px; margin-top:10px; }
+.dossier-lore { font-size:11.5px; color:var(--text-2); line-height:1.65; font-style:italic; margin:0 0 14px; padding-left:10px; border-left:2px solid var(--gold); }
+.dossier-section-title { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-3); margin:14px 0 8px; }
+.dossier-heroes-col { display:flex; flex-direction:column; gap:8px; }
+.dossier-hero { background:var(--bg-4); border:1px solid var(--border-1); border-radius:var(--r-md); padding:10px 12px; cursor:pointer; transition:border-color .15s; }
+.dossier-hero:hover { border-color:var(--accent); }
+.dossier-hero-top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.dossier-hero-name { font-family:var(--font-serif); font-size:14px; color:var(--text-0); }
+.dossier-hero-val { font-family:var(--font-mono); font-size:11px; }
+.dossier-hero-epithet { font-size:10px; color:var(--text-3); margin:2px 0 8px; line-height:1.4; }
+.dossier-main { min-width:0; }
+.dossier-spread { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+.dossier-group { background:var(--bg-3); border:1px solid var(--border-1); border-radius:var(--r-lg); padding:12px 14px; }
+.dossier-group-title { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; margin-bottom:10px; }
+.dossier-row { display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer; }
+.dossier-row:hover .dossier-row-name { color:var(--accent-bright); }
+.dossier-row-name { min-width:80px; font-size:11.5px; color:var(--text-1); }
+.dossier-row .dossier-bar { flex:1; }
+.dossier-row-val { min-width:34px; text-align:right; font-family:var(--font-mono); font-size:10px; color:var(--text-3); }
+.dossier-bar { height:6px; background:var(--bg-5); border-radius:3px; overflow:hidden; }
+.dossier-fill { height:100%; border-radius:3px; }
+@media (max-width: 900px) { .dossier { grid-template-columns:1fr; } .dossier-aside { position:static; } }
+
+/* ── Contextual sidebar panels ─────────────────────────────────── */
+.side-blurb { font-size:11px; color:var(--text-2); line-height:1.6; margin:0 0 10px; }
+.side-topline { font-size:11px; color:var(--text-2); margin-top:10px; }
+.side-arch-row { display:flex; align-items:center; gap:8px; padding:5px 4px; border-radius:var(--r-sm); cursor:pointer; }
+.side-arch-row:hover { background:var(--bg-4); }
+.side-arch-icon { width:18px; text-align:center; font-size:12px; }
+.side-arch-name { flex:1; font-size:11.5px; color:var(--text-1); }
+.side-arch-count { font-family:var(--font-mono); font-size:10px; color:var(--text-3); background:var(--bg-4); border-radius:var(--r-full); padding:2px 7px; }
+.side-legend-row { display:flex; align-items:center; gap:8px; padding:4px 0; }
+.side-legend-name { flex:1; font-size:11.5px; color:var(--text-1); }
+.side-bearer .dossier-row-name { min-width:70px; }

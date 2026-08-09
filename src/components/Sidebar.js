@@ -1,4 +1,4 @@
-import { TRAITS, PANTHEON_COLORS } from '../data/deities.js';
+import { TRAITS, PANTHEON_COLORS, DEITIES } from '../data/deities.js';
 import { getDeityById } from '../utils/similarity.js';
 import { getDeityRefs } from '../data/citations.js';
 import { STATE_KEYS } from '../utils/store.js';
@@ -22,11 +22,38 @@ const TRAIT_COLORS = {
   'fire': '#f5a623',
 };
 
+const TRAIT_ICONS = {
+  archer: '🏹', healer: '🩺', 'disease sender': '☠️', 'storm god': '⚡',
+  wilderness: '🌲', 'liminal outsider': '🌗', 'ecstasy / madness': '🍷',
+  'ascetic / wisdom': '🦉', solar: '☀️', 'war / victory': '⚔️',
+  trickster: '🎭', 'smith / craft': '⚒️', 'sea / water': '🌊',
+  'death / underworld': '💀', fertility: '🌾', fire: '🔥',
+};
+
+const TRAIT_LORE = {
+  archer: 'The far-shooter who strikes from afar. The same hand that wounds can also cure.',
+  healer: 'The divine physician who restores wholeness, standing at the threshold of death.',
+  'disease sender': 'The bringer of plague. In myth, disease was an arrow shot by an offended god.',
+  'storm god': 'The thunder-warrior who rides the storm and slays the cosmic serpent.',
+  wilderness: 'Lord of the wild places, guarding the boundary between civilization and nature.',
+  'liminal outsider': 'The threshold-dweller who crosses between life and death, order and chaos.',
+  'ecstasy / madness': 'The god who dissolves the self through wine, dance, and ritual frenzy.',
+  'ascetic / wisdom': 'Keeper of sacred knowledge, winning wisdom through sacrifice or suffering.',
+  solar: 'The all-seeing eye of the sky, driver of the golden chariot, witness to oaths.',
+  'war / victory': 'The god of battle, embodying both the berserker’s fury and the strategist’s calm.',
+  trickster: 'The boundary-crosser and culture-hero whose cunning reshapes the cosmic order.',
+  'smith / craft': 'The divine craftsman of the forge, transforming raw matter into worlds.',
+  'sea / water': 'Ruler of the deep, holding the primordial chaos that surrounds the ordered world.',
+  'death / underworld': 'First of the dead and lord of the departed, receiving and judging shades.',
+  fertility: 'The giver of increase, binding the community to the cycles of soil and season.',
+  fire: 'The messenger flame, hearth and forge, purifier and destroyer—the spark of civilization.',
+};
+
 // ── HELPERS FOR CASE-INSENSITIVE TRAIT MATCHING ─────────────────────
-const normalizeTrait = (t) => t.toLowerCase().replace(/\s*\/\s*/g, ' / ').trim();
+const normalizeTrait = (t) => (t || '').toLowerCase().replace(/\s*\/\s*/g, ' / ').trim();
 
 function getTraitValue(deity, traitName) {
-  if (!deity.traits) return 0;
+  if (!deity || !deity.traits) return 0;
   const tNorm = normalizeTrait(traitName);
   const entry = Object.entries(deity.traits).find(([k]) => normalizeTrait(k) === tNorm);
   return entry ? entry[1] : 0;
@@ -54,15 +81,131 @@ export class Sidebar {
     this.store.subscribe(STATE_KEYS.SELECTED_DEITY, () => this.render());
     this.store.subscribe(STATE_KEYS.GRAPH_DATA, () => this.render());
     this.store.subscribe(STATE_KEYS.ACTIVE_TRAIT_FILTER, () => this.render());
+    this.store.subscribe(STATE_KEYS.CURRENT_VIEW, () => this.render()); // Added for context-aware rendering
   }
 
   render() {
-    const deityId = this.store.get(STATE_KEYS.SELECTED_DEITY);
     const infoPanel = document.getElementById('stab-info-content');
     if (!infoPanel) return;
 
+    const view = this.store.get(STATE_KEYS.CURRENT_VIEW) || 'graph';
+
+    // ── Context-aware routing ──
+    if (view === 'archetypes') return this.renderArchetypePanel(infoPanel);
+    if (view === 'map')        return this.renderMapPanel(infoPanel);
+    if (view === 'matrix')     return this.renderMatrixPanel(infoPanel);
+
+    // ── Default: Graph view ──
+    return this.renderGraphPanel(infoPanel);
+  }
+
+  /* ── ARCHETYPES VIEW PANELS ─────────────────────────────────────── */
+  renderArchetypePanel(panel) {
+    const trait = this.store.get(STATE_KEYS.ACTIVE_TRAIT_FILTER);
+
+    if (!trait) {
+      panel.innerHTML = `
+        <div class="panel">
+          <div class="panel-title"><span class="panel-icon">✦</span> Archetype index</div>
+          <div class="card" style="padding:10px 12px; max-height: 600px; overflow-y: auto;">
+            <p class="side-blurb">Sixteen archetypal traits weave through the Indo-European pantheons. Select one to open its dossier.</p>
+            ${TRAITS.map(t => {
+              const count = DEITIES.filter(d => getTraitValue(d, t) > 0).length;
+              return `
+                <div class="side-arch-row" data-arch="${t}">
+                  <span class="side-arch-icon">${TRAIT_ICONS[normalizeTrait(t)] || '✦'}</span>
+                  <span class="side-arch-name">${t}</span>
+                  <span class="side-arch-count">${count}</span>
+                </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      panel.querySelectorAll('[data-arch]').forEach(el => {
+        el.addEventListener('click', () => this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, el.dataset.arch));
+      });
+      return;
+    }
+
+    const members = DEITIES
+      .map(d => ({ deity: d, value: getTraitValue(d, trait) }))
+      .filter(x => x.value > 0)
+      .sort((a, b) => b.value - a.value);
+    const pantheons = [...new Set(members.map(m => m.deity.pantheon))];
+    const top = members[0];
+
+    panel.innerHTML = `
+      <div class="panel">
+        <div class="panel-title"><span class="panel-icon">${TRAIT_ICONS[normalizeTrait(trait)] || '✦'}</span> ${trait}</div>
+        <div class="card">
+          <p class="side-blurb" style="font-style:italic;">${TRAIT_LORE[normalizeTrait(trait)] || ''}</p>
+          <div class="side-stat-row">
+            <div class="side-stat"><div class="side-stat-num">${members.length}</div><div class="side-stat-label">deities</div></div>
+            <div class="side-stat"><div class="side-stat-num">${pantheons.length}</div><div class="side-stat-label">pantheons</div></div>
+            <div class="side-stat"><div class="side-stat-num">${top ? Math.round(top.value * 100) + '%' : '—'}</div><div class="side-stat-label">peak</div></div>
+          </div>
+          ${top ? `<div class="side-topline">Strongest expression: <strong style="color:var(--text-1)">${top.deity.id}</strong> · ${top.deity.pantheon}</div>` : ''}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-icon">⬡</span> Bearers (${members.length})</div>
+        <div class="card" style="padding:8px 10px;max-height:340px;overflow-y:auto;">
+          ${members.map(m => `
+            <div class="dossier-row side-bearer" data-deity="${m.deity.id}">
+              <span class="conn-dot" style="background:${PANTHEON_COLORS[m.deity.pantheon] || '#888'}"></span>
+              <span class="dossier-row-name">${m.deity.id}</span>
+              <div class="dossier-bar"><div class="dossier-fill" style="width:${Math.round(m.value * 100)}%;background:${PANTHEON_COLORS[m.deity.pantheon] || '#888'};"></div></div>
+              <span class="dossier-row-val">${Math.round(m.value * 100)}%</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+
+    panel.querySelectorAll('[data-deity]').forEach(el => {
+      el.addEventListener('click', () => this.generator.loadDeity(el.dataset.deity, { resetGraph: true }));
+    });
+  }
+
+  /* ── MAP VIEW PANEL ─────────────────────────────────────────────── */
+  renderMapPanel(panel) {
+    const counts = {};
+    DEITIES.forEach(d => { counts[d.pantheon] = (counts[d.pantheon] || 0) + 1; });
+
+    panel.innerHTML = `
+      <div class="panel">
+        <div class="panel-title"><span class="panel-icon">🗺️</span> Migration map</div>
+        <div class="card">
+          <p class="side-blurb">Each marker is a deity placed in the homeland of its tradition. Click a marker to open that god in the graph.</p>
+          ${Object.entries(counts).map(([p, n]) => `
+            <div class="side-legend-row">
+              <span class="conn-dot" style="background:${PANTHEON_COLORS[p] || '#888'}"></span>
+              <span class="side-legend-name">${p}</span>
+              <span class="side-arch-count">${n}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  /* ── MATRIX VIEW PANEL ──────────────────────────────────────────── */
+  renderMatrixPanel(panel) {
+    panel.innerHTML = `
+      <div class="panel">
+        <div class="panel-title"><span class="panel-icon">▦</span> Similarity matrix</div>
+        <div class="card">
+          <p class="side-blurb">Every cell averages the trait-vector similarity of all deity pairs between two pantheons. Brighter cells mean deeper archetypal overlap.</p>
+          <p class="side-blurb">Click any cell to reveal the top deity pairs driving that score.</p>
+          <div class="side-stat-row">
+            <div class="side-stat"><div class="side-stat-num">${new Set(DEITIES.map(d => d.pantheon)).size}</div><div class="side-stat-label">pantheons</div></div>
+            <div class="side-stat"><div class="side-stat-num">${DEITIES.length}</div><div class="side-stat-label">deities</div></div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  /* ── GRAPH VIEW PANEL (Your exact original logic) ───────────────── */
+  renderGraphPanel(panel) {
+    const deityId = this.store.get(STATE_KEYS.SELECTED_DEITY);
+
     if (!deityId) {
-      infoPanel.innerHTML = `
+      panel.innerHTML = `
         <div class="panel">
           <div class="panel-title"><span class="panel-icon">☽</span> Explore</div>
           <div class="card" style="padding:14px 12px;">
@@ -108,13 +251,13 @@ export class Sidebar {
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, 10);
 
-    infoPanel.innerHTML = `
+    panel.innerHTML = `
       ${this.renderDeityCard(deity, col, refs)}
       ${this.renderRadar(deity)}
       ${this.renderHeatmap(deity, activeFilter)}
       ${this.renderConnections(connections)}`;
 
-    this.bindEvents(infoPanel);
+    this.bindEvents(panel);
   }
 
   renderDeityCard(deity, col, refs) {
@@ -167,10 +310,9 @@ export class Sidebar {
   }
 
   renderRadar(deity) {
-    // Get only top 8 traits for cleaner visualization
     const traitData = TRAITS.map(t => ({
       trait: t,
-      value: getTraitValue(deity, t) // <--- FIXED: Uses case-insensitive helper
+      value: getTraitValue(deity, t)
     })).sort((a, b) => b.value - a.value).slice(0, 8);
 
     if (!traitData.some(t => t.value > 0)) return '';
@@ -178,13 +320,11 @@ export class Sidebar {
     const size = 200, cx = size / 2, cy = size / 2, r = 70;
     const angleStep = (2 * Math.PI) / traitData.length;
 
-    // Concentric circles
     let gridCircles = '';
     [0.33, 0.66, 1.0].forEach(frac => {
       gridCircles += `<circle cx="${cx}" cy="${cy}" r="${r * frac}" fill="none" stroke="var(--border-1)" stroke-width="0.5" opacity="0.3"/>`;
     });
 
-    // Axes
     let axes = '';
     traitData.forEach((t, i) => {
       const angle = i * angleStep - Math.PI / 2;
@@ -193,7 +333,6 @@ export class Sidebar {
       axes += `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="var(--border-1)" stroke-width="0.5" opacity="0.3"/>`;
     });
 
-    // Data polygon
     let pts = '';
     traitData.forEach((t, i) => {
       const angle = i * angleStep - Math.PI / 2;
@@ -202,24 +341,17 @@ export class Sidebar {
       pts += `${x},${y} `;
     });
 
-    // Data points with labels
     let points = '';
     traitData.forEach((t, i) => {
       const angle = i * angleStep - Math.PI / 2;
       const x = cx + t.value * r * Math.cos(angle);
       const y = cy + t.value * r * Math.sin(angle);
-      
-      // Point
       points += `<circle cx="${x}" cy="${y}" r="3" fill="var(--accent-bright)" stroke="white" stroke-width="1.5"/>`;
-      
-      // Label (outside circle)
       const labelR = r + 15;
       const lx = cx + labelR * Math.cos(angle);
       const ly = cy + labelR * Math.sin(angle);
-      
       const shortName = t.trait.length > 12 ? t.trait.split(' ')[0] : t.trait;
       const anchor = Math.cos(angle) > 0.3 ? 'start' : (Math.cos(angle) < -0.3 ? 'end' : 'middle');
-      
       points += `<text x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle"
                        font-size="8" fill="var(--text-2)" font-weight="500">${shortName}</text>`;
     });
@@ -240,8 +372,8 @@ export class Sidebar {
 
   renderHeatmap(deity, activeFilter) {
     const sortedTraits = [...TRAITS].sort((a, b) => {
-      const va = getTraitValue(deity, a); // <--- FIXED: Uses case-insensitive helper
-      const vb = getTraitValue(deity, b); // <--- FIXED: Uses case-insensitive helper
+      const va = getTraitValue(deity, a);
+      const vb = getTraitValue(deity, b);
       return vb - va;
     });
 
@@ -250,8 +382,8 @@ export class Sidebar {
         <div class="panel-title"><span class="panel-icon">▦</span> Trait heatmap</div>
         <div class="card" style="padding:10px 12px;">
           ${sortedTraits.map(t => {
-            const val = getTraitValue(deity, t); // <--- FIXED: Extracts actual numeric value
-            const color = getTraitColor(t);       // <--- FIXED: Extracts correct hex color
+            const val = getTraitValue(deity, t);
+            const color = getTraitColor(t);
             const pct = (val * 100).toFixed(0);
             return `
               <div class="hm-row">
