@@ -22,6 +22,23 @@ const TRAIT_COLORS = {
   'fire': '#f5a623',
 };
 
+// ── HELPERS FOR CASE-INSENSITIVE TRAIT MATCHING ─────────────────────
+const normalizeTrait = (t) => t.toLowerCase().replace(/\s*\/\s*/g, ' / ').trim();
+
+function getTraitValue(deity, traitName) {
+  if (!deity.traits) return 0;
+  const tNorm = normalizeTrait(traitName);
+  const entry = Object.entries(deity.traits).find(([k]) => normalizeTrait(k) === tNorm);
+  return entry ? entry[1] : 0;
+}
+
+function getTraitColor(traitName) {
+  const tNorm = normalizeTrait(traitName);
+  const key = Object.keys(TRAIT_COLORS).find(k => normalizeTrait(k) === tNorm);
+  return key ? TRAIT_COLORS[key] : '#888';
+}
+// ─────────────────────────────────────────────────────────────────────
+
 export class Sidebar {
   constructor(store, generator, feedback) {
     this.store = store;
@@ -153,7 +170,7 @@ export class Sidebar {
     // Get only top 8 traits for cleaner visualization
     const traitData = TRAITS.map(t => ({
       trait: t,
-      value: deity.traits?.[t] || 0
+      value: getTraitValue(deity, t) // <--- FIXED: Uses case-insensitive helper
     })).sort((a, b) => b.value - a.value).slice(0, 8);
 
     if (!traitData.some(t => t.value > 0)) return '';
@@ -223,8 +240,8 @@ export class Sidebar {
 
   renderHeatmap(deity, activeFilter) {
     const sortedTraits = [...TRAITS].sort((a, b) => {
-      const va = deity.traits?.[a] || 0;
-      const vb = deity.traits?.[b] || 0;
+      const va = getTraitValue(deity, a); // <--- FIXED: Uses case-insensitive helper
+      const vb = getTraitValue(deity, b); // <--- FIXED: Uses case-insensitive helper
       return vb - va;
     });
 
@@ -233,8 +250,8 @@ export class Sidebar {
         <div class="panel-title"><span class="panel-icon">▦</span> Trait heatmap</div>
         <div class="card" style="padding:10px 12px;">
           ${sortedTraits.map(t => {
-            const val = deity.traits?.[t] || 0;
-            const color = TRAIT_COLORS[t] || '#888';
+            const val = getTraitValue(deity, t); // <--- FIXED: Extracts actual numeric value
+            const color = getTraitColor(t);       // <--- FIXED: Extracts correct hex color
             const pct = (val * 100).toFixed(0);
             return `
               <div class="hm-row">

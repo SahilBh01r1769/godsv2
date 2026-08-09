@@ -36,15 +36,25 @@ export class ArchetypesView {
         <div class="archetype-grid">`;
 
     TRAITS.forEach(trait => {
-      const deitiesWithTrait = DEITIES.filter(d => d.traits && d.traits[trait] > 0);
-      const isActive = activeTrait === trait;
+      const tNorm = trait.toLowerCase().replace(/\s*\/\s*/g, ' / ').trim();
+      
+      // Case-insensitive lookup for rendering
+      const deitiesWithTrait = DEITIES.filter(d => {
+        if (!d.traits) return false;
+        return Object.keys(d.traits).some(k => {
+          const kNorm = k.toLowerCase().replace(/\s*\/\s*/g, ' / ').trim();
+          return kNorm === tNorm && d.traits[k] > 0;
+        });
+      });
+
       html += `
-        <div class="archetype-card ${isActive ? 'active' : ''}" data-trait="${trait}">
+        <div class="archetype-card ${activeTrait === trait ? 'active' : ''}" data-trait="${trait}">
           <div class="archetype-name">${trait}</div>
           <div class="archetype-count">${deitiesWithTrait.length} deities</div>
-          <div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:6px;">
+          <div class="archetype-dots" style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:6px;">
             ${deitiesWithTrait.slice(0, 8).map(d =>
-              `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${PANTHEON_COLORS[d.pantheon]}" title="${d.id}"></span>`
+              // FIX FOR ISSUE 2: Added inline styles for width, height, and border-radius
+              `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${PANTHEON_COLORS[d.pantheon]};" title="${d.id}"></span>`
             ).join('')}
             ${deitiesWithTrait.length > 8 ? `<span style="font-size:9px;color:var(--text-3);align-self:center;">+${deitiesWithTrait.length - 8}</span>` : ''}
           </div>
@@ -58,28 +68,34 @@ export class ArchetypesView {
     }
 
     html += `</div>`;
-
     this.container.innerHTML = html;
 
     this.container.querySelectorAll('.archetype-card').forEach(card => {
       card.addEventListener('click', () => {
         const trait = card.dataset.trait;
-        const deitiesWithTrait = DEITIES.filter(d => d.traits && d.traits[trait] > 0);
+        const tNorm = trait.toLowerCase().replace(/\s*\/\s*/g, ' / ').trim();
+
+        // FIX FOR ISSUE 1: Use case-insensitive lookup for the click handler
+        const deitiesWithTrait = DEITIES.filter(d => {
+          if (!d.traits) return false;
+          return Object.keys(d.traits).some(k => {
+            const kNorm = k.toLowerCase().replace(/\s*\/\s*/g, ' / ').trim();
+            return kNorm === tNorm && d.traits[k] > 0;
+          });
+        });
 
         if (deitiesWithTrait.length === 0) return;
 
-        // Pick the deity with highest trait value
+        // Pick the deity with highest trait value (also needs case-insensitive extraction)
         const bestDeity = deitiesWithTrait.reduce((best, d) => {
-          const val = d.traits[trait] || 0;
-          const bestVal = best.traits[trait] || 0;
+          const val = Object.entries(d.traits).find(([k]) => k.toLowerCase().replace(/\s*\/\s*/g, ' / ').trim() === tNorm)?.[1] || 0;
+          const bestVal = Object.entries(best.traits).find(([k]) => k.toLowerCase().replace(/\s*\/\s*/g, ' / ').trim() === tNorm)?.[1] || 0;
           return val > bestVal ? d : best;
         }, deitiesWithTrait[0]);
 
         this.store.set(STATE_KEYS.ACTIVE_TRAIT_FILTER, trait);
         this.store.set(STATE_KEYS.CURRENT_VIEW, 'graph');
-
         this.generator.loadDeity(bestDeity.id, { resetGraph: true });
-
         this.render();
       });
     });

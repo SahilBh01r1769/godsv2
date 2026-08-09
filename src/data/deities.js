@@ -22,18 +22,18 @@ export const TRAITS = [
   'Fire',
 ];
 
-
 export const PANTHEON_COLORS = {
-  Greek:         '#4a9eff',
-  Vedic:         '#e85555',
-  Norse:         '#9b8fe8',
-  Celtic:        '#2ec27e',
-  Roman:         '#f5a623',
-  Slavic:        '#f06830',
-  Mesopotamian:  '#e87bb4',
-  Iranian:       '#20c5c5',
-  Egyptian:      '#d4a017',
+  Greek:         '#5BA7FF', // vivid sky blue
+  Vedic:         '#FF4F81', // hot pink
+  Norse:         '#3e2589', // electric violet
+  Celtic:        '#35D07F', // emerald green
+  Roman:         '#FFB52E', // golden amber
+  Slavic:        '#FF6B35', // bright orange
+  Mesopotamian:  '#D66BFF', // magenta purple
+  Iranian:       '#20D9D2', // turquoise
+  Egyptian:      '#00BFA6', // deep teal
 };
+
 
 export const DEITIES = [
   // ── GREEK ──────────────────────────────────────────────────────

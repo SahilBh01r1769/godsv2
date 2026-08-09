@@ -1,4 +1,4 @@
-import { DEITIES } from '../data/deities.js';
+import { DEITIES, TRAITS } from '../data/deities.js';
 import { TOURS } from '../data/tours.js';
 import { STATE_KEYS } from '../utils/store.js';
 
@@ -46,6 +46,8 @@ export class App {
   }
 
   start() {
+
+
     this.store.set(STATE_KEYS.DEITIES, DEITIES);
     this.store.set(STATE_KEYS.TOURS, TOURS);
 

@@ -798,3 +798,8 @@
   border: 1px solid var(--border-1);
   color: var(--text-1);
 }
+
+/* Capitalizes the small "pill" tags shown in the sidebar */
+.trait-pill {
+  text-transform: capitalize;
+}
